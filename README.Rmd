@@ -35,6 +35,26 @@ Here, \(S_i\) captures the strength or intensity of infection for diseased subje
 
 ---
 
+## 1. `bayesian_severity_LCA()`
+
+A unified function implementing two prior choices for the latent severity parameter \( S_i \):
+
+- **Gamma Severity Model**  
+  \( S_i \sim \text{Gamma}(\alpha_S, \beta_S) \)
+- **Normal Moment (NM+) Severity Model**  
+  \( p(S_i) \propto S_i^2 \exp\!\left[-(S_i - \mu_0)^2 / (2\tau^2)\right] \),  \( S_i > 0 \)
+
+Both models employ MCMC with truncated-normal data augmentation for latent test variables, and include posterior updates for:
+- Class indicator \( D_i \)
+- Test parameters \( (\beta_j, \gamma_j, \sigma_j^2) \)
+- Prevalence \( \rho \)
+- Severity priors (Gamma or NM+)
+
+---
+
+### Candidate Priors for Severity
+
+The following figure compares the Gamma and NM+ priors for \( S_i \) when each has variance = 1:
 
 ```{r, echo = FALSE}
 library(dplyr)

@@ -1,6 +1,6 @@
 ---
 title: "Bayesian Latent Severity LCA"
-output: github_document
+output: rmarkdown::github_document
 ---
 
 A **Bayesian latent class model with continuous severity** for diagnostic test evaluation.

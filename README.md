@@ -56,4 +56,4 @@ Prevalence $\rho$ - Severity priors (Gamma or NM+)
 The following figure compares the Gamma and NM+ priors for $S_i$ when
 each has variance = 1:
 
-![](README_files/unnamed-chunk-2-1.png)<!-- -->
+![](README_files/unnamed-chunk-1-1.png)<!-- -->

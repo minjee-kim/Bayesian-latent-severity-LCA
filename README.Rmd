@@ -1,0 +1,16 @@
+---
+title: "Latent Severity LCA"
+output: html_document
+date: "2025-10-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Latent Severity LCA
+
+A **Bayesian latent class model with continuous severity** for diagnostic test evaluation.
+
+This project introduces a *latent severity* parameter \( S_i \) to extend classical Hui–Walter and random-effects latent class models. The approach allows efficient estimation of diagnostic accuracies and prevalence with **fewer than four assays**, addressing identifiability challenges in small-panel diagnostic evaluations.
+

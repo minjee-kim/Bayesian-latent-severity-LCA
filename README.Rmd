@@ -104,3 +104,15 @@ ggplot(df, aes(x = Si, fill = Distribution, color = Distribution)) +
   theme(legend.title = element_blank())
 ```
 
+
+
+
+
+```{r, echo = FALSE}
+rmarkdown::render(
+    "README.Rmd",
+    output_format = "rmarkdown::github_document",
+    output_file = "README.md"
+)
+```
+

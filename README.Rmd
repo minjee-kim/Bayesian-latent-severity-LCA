@@ -37,6 +37,25 @@ Here, \(S_i\) captures the strength or intensity of infection for diseased subje
 
 
 ```{r, echo = FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+sample_NM <- function(n, mu0, tau, grid_size = 1e4) {
+  x_vals <- seq(0, mu0 + 6 * tau, length.out = grid_size)
+  dens_vals <- 2 * (x_vals^2) / (sqrt(2 * pi) * tau^3) * 
+    exp(-((x_vals - mu0)^2) / (2 * tau^2))
+  dx <- x_vals[2] - x_vals[1]
+  dens_vals <- dens_vals / sum(dens_vals * dx)
+  
+  cdf_vals <- cumsum(dens_vals * dx)
+  
+  # Sample from uniform and interpolate inverse CDF
+  u <- runif(n)
+  samples <- approx(cdf_vals, x_vals, xout = u, rule = 2)$y
+  
+  return(samples)
+}
+N = 5000
 vart = 1/sqrt(3 - 8/pi)
 Si_nm  <- sample_NM(N, mu0 = 0, tau = vart)          
 Si_gam <- rgamma(N, shape = 4.5, rate = sqrt(4.5))                

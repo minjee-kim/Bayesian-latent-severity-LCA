@@ -31,16 +31,24 @@ sensitivity, specificity, and prevalence.
 
 ------------------------------------------------------------------------
 
-## 1. `bayesian_severity_LCA()`
+### 1. `bayesian_severity_LCA()`
 
 A unified function implementing two prior choices for the latent
 severity parameter $S_i$:
 
 - **Gamma Severity Model**  
-  $S_i \sim \text{Gamma}(\alpha_S, \beta_S)$
+  $$
+  S_i \mid D_i=1 \sim \mathrm{Gamma}(\alpha_S,\beta_S), 
+  \qquad
+  \beta_S \sim \mathrm{Gamma}(a_\beta,b_\beta),
+  $$
+
 - **Normal Moment (NM+) Severity Model**  
-  $p(S_i) \propto S_i^2 \exp\!\left[-(S_i - \mu_0)^2 / (2\tau^2)\right]$,
-  $S_i > 0$
+  $$
+  p(S_i \mid D_i=1) \propto S_i^2 \exp\!\left[-\frac{(S_i-\mu_0)^2}{2\tau^2}\right], \quad S_i>0,
+  \qquad
+  \tau^2 \sim \mathrm{Inv\text{-}Gamma}(a_\tau,b_\tau).
+  $$
 
 Both models employ MCMC with truncated-normal data augmentation for
 latent test variables, and include posterior updates for: - Class

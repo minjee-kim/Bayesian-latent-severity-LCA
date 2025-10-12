@@ -3,6 +3,16 @@ title: "Bayesian Latent Severity LCA"
 output: rmarkdown::github_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.path = "README_files/"
+)
+```
+
+
 A **Bayesian latent class model with continuous severity** for diagnostic test evaluation.
 
 This project extends classical Hui–Walter and random-effects LCA frameworks by introducing a continuous *latent severity* parameter \(S_i\).  

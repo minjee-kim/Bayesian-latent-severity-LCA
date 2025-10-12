@@ -37,18 +37,12 @@ A unified function implementing two prior choices for the latent
 severity parameter $S_i$:
 
 - **Gamma Severity Model**  
-  $$
-  S_i \mid D_i=1 \sim \mathrm{Gamma}(\alpha_S,\beta_S), 
-  \qquad
-  \beta_S \sim \mathrm{Gamma}(a_\beta,b_\beta),
-  $$
+  $S_i \mid D_i = 1 \sim \mathrm{Gamma}(\alpha_S, \beta_S)$, 
+  $\beta_S \sim \mathrm{Gamma}(a_\beta, b_\beta)$
 
-- **Normal Moment (NM+) Severity Model**  
-  $$
-  p(S_i \mid D_i=1) \propto S_i^2 \exp\!\left[-\frac{(S_i-\mu_0)^2}{2\tau^2}\right], \quad S_i>0,
-  \qquad
-  \tau^2 \sim \mathrm{Inv\text{-}Gamma}(a_\tau,b_\tau).
-  $$
+- **Normal Moment (NM⁺) Severity Model**  
+  $p(S_i \mid D_i = 1) \propto S_i^2 \exp[-(S_i - \mu_0)^2 / (2\tau^2)]$, 
+  $S_i > 0$,  $\tau^2 \sim \mathrm{Inv\text{-}Gamma}(a_\tau, b_\tau)$
 
 Both models employ MCMC with truncated-normal data augmentation for
 latent test variables, and include posterior updates for: - Class
@@ -62,4 +56,4 @@ Prevalence $\rho$ - Severity priors (Gamma or NM+)
 The following figure compares the Gamma and NM+ priors for $S_i$ when
 each has variance = 1:
 
-![](README_files/unnamed-chunk-1-1.png)<!-- -->
+![](README_files/unnamed-chunk-2-1.png)<!-- -->

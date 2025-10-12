@@ -119,10 +119,10 @@ ggplot(df, aes(x = Si, fill = Distribution, color = Distribution)) +
 
 
 ```{r, echo = FALSE}
-rmarkdown::render(
-    "README.Rmd",
-    output_format = "rmarkdown::github_document",
-    output_file = "README.md"
-)
+# rmarkdown::render(
+#     "README.Rmd",
+#     output_format = "rmarkdown::github_document",
+#     output_file = "README.md"
+# )
 ```
 

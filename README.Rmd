@@ -93,7 +93,7 @@ df <- tibble(
     Distribution = factor(
       Distribution,
       levels = c("NMplus", "Gamma"),
-      labels = c("NM+ (μ=0, τ=1)", "Gamma (shape=4.5, rate=2.5)")
+      labels = c("NM+ (μ=0, τ=1/sqrt(3 - 8/pi))", "Gamma (shape=4.5, rate=sqrt(4.5))")
     )
   )
 

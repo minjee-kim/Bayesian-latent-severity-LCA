@@ -25,3 +25,15 @@ expanded <- rep(patterns, freq)
 k <- nchar(patterns[1])
 data <- do.call(rbind, strsplit(expanded, ""))
 data <- as.data.frame(apply(data, 2, as.numeric))
+
+
+###### calling the functions ########################## 
+handelman_fixed <- bayes_2LCR(data = data, model="fixed",
+                        iterations=20000, burnin=3000)
+handelman_rand <- bayes_2LCR(data = data, model="random", 
+                       iterations=20000, burnin=3000)
+handelman_2lcr1 <- bayes_2LCR(data = data, model="2LCR1", 
+                             iterations=20000, burnin=3000)
+
+
+

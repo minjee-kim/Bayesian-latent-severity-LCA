@@ -35,6 +35,7 @@ prior_input = list(
 fit_fixed <- bayes_2LCR(data = data, model="fixed",
                         iterations=20000, burnin=3000, thin=2,
                         prior_input=prior_input)
+# saveRDS(fit_fixed, "Strongyloides_fixed.RDS")
 
 prior_input <- list(
   prev = c(1,1),   # Beta(a,b) for prevalence
@@ -51,12 +52,12 @@ prior_input <- list(
          b0 = list(mean =  0.861, sd = 0.5))
   ),
   # for 2LCR1 you can set this to TRUE or specify in the model argument 
-  common_slopes = FALSE  # TRUE => b0,b1 shared across tests
+  common_slopes = FALSE  # TRUE: b0,b1 shared across tests
 )
 
 fit_rand <- bayes_2LCR(data = data, model="2LCR1", 
                        iterations = 200000, burnin=30000, thin=2,
                        common_slopes = TRUE,
                        prior_input=prior_input)
-
+# saveRDS(fit_rand, "Strongyloides_random.RDS")
 

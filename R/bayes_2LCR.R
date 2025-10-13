@@ -1,16 +1,15 @@
 
 
-
 library(truncnorm)
 
 bayes_2LCR <- function(data, model = c("2LC","2LCR1","2LCR"), 
                        iterations = 6000, burnin = 3000, thin = 1,
                        a_rho = 0.5, b_rho = 0.5, # rho ~ Beta(a_rho, b_rho)
-                       mu_a0 = 0, s2_a0 = 1^2, # a_{j,0} ~ N(mu_a0, s2_a0)
-                       mu_a1 = 0, s2_a1 = 1^2, # a_{j,1} ~ N(mu_a1, s2_a1)
-                       mu_b0 = 0, s2_b0 = 1^2, # b_{j,0} ~ N(mu_b0, s2_b0)
-                       mu_b1 = 0, s2_b1 = 1^2 # b_{j,1} ~ N(mu_b1, s2_b1)
-){
+                       mu_a0 = 1, s2_a0 = 5^2, # a_{j,0} ~ N(mu_a0, s2_a0)
+                       mu_a1 = 1, s2_a1 = 5^2, # a_{j,1} ~ N(mu_a1, s2_a1)
+                       mu_b0 = 1, s2_b0 = 5^2, # b_{j,0} ~ N(mu_b0, s2_b0)
+                       mu_b1 = 1, s2_b1 = 5^2 # b_{j,1} ~ N(mu_b1, s2_b1)
+                       ){
   
   Y <- as.matrix(data)
   N <- nrow(Y); J <- ncol(Y)
@@ -40,13 +39,13 @@ bayes_2LCR <- function(data, model = c("2LC","2LCR1","2LCR"),
   SENS <- matrix(NA, n_keep, J)
   SPEC <- matrix(NA, n_keep, J)
   D_keep <- matrix(NA, n_keep, N)
-  
+
   # initialize
   rho <- 0.1
   D <- rbinom(N, 1, rho)
   a0 <- rnorm(J, mean = mu_a0, sd = sqrt(s2_a0))
   a1 <- rnorm(J, mean = mu_a1, sd = sqrt(s2_a1))
-  
+
   if (model == "2LC") { # CI model: no random effects
     b0 <- rep(0, J)  # slopes are zero
     b1 <- rep(0, J)
@@ -67,35 +66,36 @@ bayes_2LCR <- function(data, model = c("2LC","2LCR1","2LCR"),
   cap <- 8 ## to use for capping 
   
   for (it in 1:iterations){
-    
+  
     # 1) latent Z
     if (model == "2LC") {
       eta0 <- matrix(a0, N, J, byrow = TRUE)
       eta1 <- matrix(a1, N, J, byrow = TRUE)
     } else if (model == "2LCR1") {
-      # b0 and b1 are scalars (length 1)
       eta0 <- matrix(a0, N, J, byrow = TRUE) + matrix(b0 * I, N, J, byrow = FALSE)
       eta1 <- matrix(a1, N, J, byrow = TRUE) + matrix(b1 * I, N, J, byrow = FALSE)
     } else if (model == "2LCR"){
-      # per-test slopes: b0 and b1 are vectors length J
       eta0 <- matrix(a0, N, J, byrow = TRUE) + tcrossprod(I, b0)
       eta1 <- matrix(a1, N, J, byrow = TRUE) + tcrossprod(I, b1)
     }
+    
     eta0 <- pmin(pmax(eta0, -cap), cap)
     eta1 <- pmin(pmax(eta1, -cap), cap)
     
-    m1 <- (Y == 1); m1[is.na(m1)] <- FALSE
-    m0 <- (Y == 0); m0[is.na(m0)] <- FALSE
-    
     MU <- eta0
-    if (any(D == 1L)) MU[D == 1L, ] <- eta1[D == 1L, ]
+    if (any(D == 1)) MU[D == 1, ] <- eta1[D == 1, ]
     
     Z <- matrix(0, N, J)
+    m1 <- (Y == 1)
+    m1[is.na(m1)] <- FALSE
+    m0 <- (Y == 0)
+    m0[is.na(m0)] <- FALSE
+    
     s1 <- sum(m1)
     if (s1 > 0) Z[m1] <- rtruncnorm(s1, a = 0,    b = Inf, mean = MU[m1], sd = 1)
     s0 <- sum(m0)
     if (s0 > 0) Z[m0] <- rtruncnorm(s0, a = -Inf, b = 0,   mean = MU[m0], sd = 1)
-    
+
     # 2) update a0_j, a1_j conjugate normals
     idx0_sub <- which(D == 0)
     idx1_sub <- which(D == 1)
@@ -107,13 +107,11 @@ bayes_2LCR <- function(data, model = c("2LC","2LCR1","2LCR"),
       Z0 <- Z[idx0_sub, , drop = FALSE]
       I0 <- I[idx0_sub]
       
-      if (model == "2LC") {
-        S0 <- Z0  # no slope
-      } else if (model == "2LCR1") {
-        S0 <- Z0 - matrix(I0 * b0, n0_sub, J, byrow = FALSE)
-      } else if (model == "2LCR") {
-        S0 <- Z0 - (matrix(I0, n0_sub, J, byrow = FALSE) * matrix(b0, n0_sub, J, byrow = TRUE))
-      }
+      S0 <- switch(model,
+                   "2LC"   = Z0,
+                   "2LCR1" = Z0 - matrix(I0 * b0, n0_sub, J, byrow = FALSE),
+                   "2LCR"  = Z0 - (matrix(I0, n0_sub, J, byrow = FALSE) * matrix(b0, n0_sub, J, byrow = TRUE))
+      )
       post_var0  <- 1 / (n0_sub + 1 / s2_a0)
       post_mean0 <- post_var0 * (colSums(S0) + mu_a0 / s2_a0)
       a0 <- rnorm(J, post_mean0, sqrt(post_var0))
@@ -123,16 +121,12 @@ bayes_2LCR <- function(data, model = c("2LC","2LCR1","2LCR"),
     
     # for class 1
     if (n1_sub > 0){
-      Z1 <- Z[idx1_sub, , drop = FALSE]
-      I1 <- I[idx1_sub]
-      
-      if (model == "2LC") {
-        S1 <- Z1
-      } else if (model == "2LCR1") {
-        S1 <- Z1 - matrix(I1 * b1, n1_sub, J, byrow = FALSE)
-      } else {
-        S1 <- Z1 - (matrix(I1, n1_sub, J, byrow = FALSE) * matrix(b1, n1_sub, J, byrow = TRUE))
-      }
+      Z1 <- Z[idx1_sub, , drop = FALSE]; I1 <- I[idx1_sub]
+      S1 <- switch(model,
+                   "2LC"   = Z1,
+                   "2LCR1" = Z1 - matrix(I1 * b1, n1_sub, J, byrow = FALSE),
+                   "2LCR"  = Z1 - (matrix(I1, n1_sub, J, byrow = FALSE) * matrix(b1, n1_sub, J, byrow = TRUE))
+      )
       post_var1  <- 1 / (n1_sub + 1 / s2_a1)
       post_mean1 <- post_var1 * (colSums(S1) + mu_a1 / s2_a1)
       a1 <- rnorm(J, post_mean1, sqrt(post_var1))
@@ -146,7 +140,7 @@ bayes_2LCR <- function(data, model = c("2LC","2LCR1","2LCR"),
         diff0 <- Z[idx0_sub, , drop = FALSE] - matrix(a0, n0_sub, J, byrow = TRUE)
         b0_vec <- if (model == "2LCR1") rep(b0, J) else b0
         R0 <- rowSums(diff0 * matrix(b0_vec, n0_sub, J, byrow = TRUE))
-        varI0  <- 1 / (sum(b0_vec^2) + 1)
+        varI0  <- 1 / (sum(b0_vec^2) + 1)  # prior Var(I)=1
         I[idx0_sub] <- rnorm(n0_sub, varI0 * R0, sqrt(varI0))
       }
       if (n1_sub > 0) {
@@ -198,34 +192,35 @@ bayes_2LCR <- function(data, model = c("2LC","2LCR1","2LCR"),
       } else b1 <- rnorm(J, mu_b1, sqrt(s2_b1))
     }
     
-    # Update D
     if (model == "2LC") {
-      eta1 <- matrix(a1, N, J, byrow = TRUE)
       eta0 <- matrix(a0, N, J, byrow = TRUE)
+      eta1 <- matrix(a1, N, J, byrow = TRUE)
     } else if (model == "2LCR1") {
-      eta1 <- matrix(a1, N, J, byrow = TRUE) + matrix(b1 * I, N, J, byrow = FALSE)
       eta0 <- matrix(a0, N, J, byrow = TRUE) + matrix(b0 * I, N, J, byrow = FALSE)
-    } else if (model == "2LCR"){
-      eta1 <- matrix(a1, N, J, byrow = TRUE) + tcrossprod(I, b1)
+      eta1 <- matrix(a1, N, J, byrow = TRUE) + matrix(b1 * I, N, J, byrow = FALSE)
+    } else {
       eta0 <- matrix(a0, N, J, byrow = TRUE) + tcrossprod(I, b0)
+      eta1 <- matrix(a1, N, J, byrow = TRUE) + tcrossprod(I, b1)
     }
-    
-    eta1 <- pmin(pmax(eta1, -cap), cap)
     eta0 <- pmin(pmax(eta0, -cap), cap)
+    eta1 <- pmin(pmax(eta1, -cap), cap)
     
-    ll1_cells <- ifelse(Y == 1, pnorm(eta1, log.p = TRUE),
-                        pnorm(eta1, lower.tail = FALSE, log.p = TRUE))
-    ll0_cells <- ifelse(Y == 1, pnorm(eta0, log.p = TRUE),
-                        pnorm(eta0, lower.tail = FALSE, log.p = TRUE))
-    loglik1 <- rowSums(ll1_cells)
-    loglik0 <- rowSums(ll0_cells)
+    ll1 <- ifelse(Y == 1, pnorm(eta1, log.p = TRUE),
+                  pnorm(eta1, lower.tail = FALSE, log.p = TRUE))
+    ll0 <- ifelse(Y == 1, pnorm(eta0, log.p = TRUE),
+                  pnorm(eta0, lower.tail = FALSE, log.p = TRUE))
+    ll1[is.na(Y)] <- 0
+    ll0[is.na(Y)] <- 0
     
-    # log posterior odds for D=1
+    loglik1 <- rowSums(ll1)
+    loglik0 <- rowSums(ll0)
     logit_p1 <- (loglik1 - loglik0) + (log(rho) - log1p(-rho))
-    D  <- rbinom(N, 1, plogis(logit_p1))
+    D <- rbinom(N, 1, plogis(logit_p1))
+    
     
     # prevalence
-    rho <- rbeta(1, a_rho + sum(D), b_rho + (N - sum(D)))
+    rho <- rbeta(1, a_rho + sum(D), b_rho + (N - sum(D)))    
+    
     
     # save
     if (it > burnin && ((it - burnin) %% thin == 0)) {

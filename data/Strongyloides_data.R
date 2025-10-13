@@ -22,6 +22,9 @@ data <- do.call(rbind, strsplit(expanded, ""))
 data <- as.data.frame(apply(data, 2, as.numeric))
 table(data)
 
+##################################################################################
+######### Reproducing the results on Joseph, Dendukuri 2001 page 159 #############
+##################################################################################
 prior_input = list(
   prev = c(1,1),  # Beta(1,1) on prevalence
   tests = list(

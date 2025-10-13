@@ -13,6 +13,8 @@
 # This script programmatically reconstructs an expanded binary dataset
 # for research and reproducibility purposes only. Do not redistribute without citation.
 
+set.seed(123)
+
 patterns <- c("00", "10", "01", "11")
 freq     <- c(38, 2, 87, 35)
 
@@ -32,10 +34,10 @@ prior_input = list(
     list(sens=c(21.96, 5.49), spec=c(4.1, 1.76))   # Test 2
   )
 )
-fit_fixed <- bayes_2LCR(data = data, model="fixed",
-                        iterations=20000, burnin=3000, thin=2,
+fit_CI <- bayes_2LCR(data = data, model="CI",
+                        iterations = 25000, burnin=5000, thin=1,
                         prior_input=prior_input)
-# saveRDS(fit_fixed, "Strongyloides_fixed.RDS")
+# saveRDS(fit_CI, "Strongyloides_CI.RDS")
 
 prior_input <- list(
   prev = c(1,1),   # Beta(a,b) for prevalence
@@ -50,14 +52,13 @@ prior_input <- list(
          a0 = list(mean =  0.692, sd = 0.560),
          b1 = list(mean =  0.668, sd = 0.5),           # class 0 slope
          b0 = list(mean =  0.861, sd = 0.5))
-  ),
-  # for 2LCR1 you can set this to TRUE or specify in the model argument 
-  common_slopes = FALSE  # TRUE: b0,b1 shared across tests
+  )
 )
 
 fit_rand <- bayes_2LCR(data = data, model="2LCR1", 
-                       iterations = 200000, burnin=30000, thin=2,
-                       common_slopes = TRUE,
+                       common_slopes = FALSE,
+                       iterations = 25000, burnin=5000, thin=1,
                        prior_input=prior_input)
+
 # saveRDS(fit_rand, "Strongyloides_random.RDS")
 

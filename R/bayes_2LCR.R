@@ -3,7 +3,7 @@
 # LCM based on Dendukuri & Joseph 2001 (probit link)
 # -----------------------------------------------------------
 # Models:
-#   - model = "fixed"   : Conditional-independence (CI / Hui–Walter). Parameters are:
+#   - model = "CI"   : Conditional-independence (CI / Hui–Walter). Parameters are:
 #       prevalence  ρ ~ Beta(aρ,bρ)
 #       per test j: Sens_j ~ Beta(aSe_j, bSe_j),  Spec_j ~ Beta(aSp_j, bSp_j)
 #     Priors are provided via prior_input$prev = c(aρ,bρ) and
@@ -29,7 +29,7 @@
 # Outputs:
 #   - rho: MCMC draws of prevalence
 #   - sens, spec: per-draw implied Se/Sp (for random/2LCR1 computed via probit mapping)
-#   - a0,a1,b0,b1: probit parameters (NA in fixed model)
+#   - a0,a1,b0,b1: probit parameters (NA in CI model)
 #   - D: sampled latent disease indicators per iteration
 #
 # Notes:
@@ -39,13 +39,13 @@
 #
 library(truncnorm)
 
-bayes_2LCR <- function(data, model = c("fixed","random","2LCR1"),
+bayes_2LCR <- function(data, model = c("CI","random","2LCR1"),
                        prior_input = NULL, common_slopes = FALSE, 
                        iterations = 5000, burnin = 2000, thin = 1){
   
   
   # Helper: fill defaults for priors
-  .fill_default_tests_fixed <- function(J, tests = NULL) {
+  .fill_default_tests_CI <- function(J, tests = NULL) {
     out <- vector("list", J)
     for (j in 1:J) {
       tj <- if (!is.null(tests) && length(tests) >= j) tests[[j]] else NULL
@@ -76,7 +76,7 @@ bayes_2LCR <- function(data, model = c("fixed","random","2LCR1"),
     }
     out <- list(a_rho = prior_input$prev[1], b_rho = prior_input$prev[2])
     
-    if (model == "fixed") return(out)
+    if (model == "CI") return(out)
     
     # defaults
     tests_list <- prior_input$tests
@@ -175,13 +175,13 @@ bayes_2LCR <- function(data, model = c("fixed","random","2LCR1"),
   keep <- 0
   
   # =========================
-  # (A) FIXED (CI) MODEL
+  # (A) Condiitonal Independence MODEL
   # =========================
-  if (model == "fixed") {
+  if (model == "CI") {
     if (is.null(prior_input$prev)) prior_input$prev <- c(1,1)
     a_rho <- prior_input$prev[1]; b_rho <- prior_input$prev[2]
     
-    if (is.null(prior_input$tests)) prior_input$tests <- .fill_default_tests_fixed(J)
+    if (is.null(prior_input$tests)) prior_input$tests <- .fill_default_tests_CI(J)
     if (length(prior_input$tests) != J)
       stop("prior_input$tests must be length J (or omit to use defaults).")
     
@@ -242,7 +242,7 @@ bayes_2LCR <- function(data, model = c("fixed","random","2LCR1"),
     return(list(
       rho = RHO,
       sens = SENS, spec = SPEC,
-      a0 = A0, a1 = A1, b0 = B0, b1 = B1,  # NA for fixed
+      a0 = A0, a1 = A1, b0 = B0, b1 = B1,  # NA for CI
       D = D_keep, model = model
     ))
   }

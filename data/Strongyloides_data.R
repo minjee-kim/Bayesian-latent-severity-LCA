@@ -62,3 +62,52 @@ fit_rand <- bayes_2LCR(data = data, model="2LCR1",
 
 # saveRDS(fit_rand, "Strongyloides_random.RDS")
 
+
+
+##################################################################################
+######### Running our model on the same data #####################################
+##################################################################################
+
+ranges <- list(
+  list(sens=c(0.07, 0.47), spec=c(0.89, 0.99)),   # test 1
+  list(sens=c(0.63, 0.92), spec=c(0.31, 0.96))   # test 2
+)
+
+fitCI <- Bayesian_LCA_severity(
+  data       = data,
+  iterations = 500000,
+  burnin     = 500000,
+  thin       = 2,
+  severity_prior = list(type="ci"),
+  ranges     = ranges,
+  ci_level   = 0.95,
+  nsim       = 30000
+)
+saveRDS(fitCI, "Strongyloides_BLS_CI.RDS")
+
+fitGamma <- Bayesian_LCA_severity(
+  data       = data,
+  iterations = 500000,
+  burnin     = 500000,
+  thin       = 2,
+  severity_prior = list(type="gamma", aS = 3, bS = sqrt(3)),
+  ranges     = ranges,
+  ci_level   = 0.95,
+  nsim       = 30000
+)
+saveRDS(fitGamma, "Strongyloides_BLS_Gamma.RDS")
+
+fitNM <- Bayesian_LCA_severity(
+  data       = data,
+  iterations = 500000,
+  burnin     = 500000,
+  thin       = 2,
+  severity_prior = list(type="normal moment", mu0=0, tau=1.48495),
+  ranges     = ranges,
+  ci_level   = 0.95,
+  nsim       = 30000
+)
+fitNM$rho_Samples
+saveRDS(fitNM, "Strongyloides_BLS_NM.RDS")
+
+

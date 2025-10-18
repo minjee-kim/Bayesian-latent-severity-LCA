@@ -1,6 +1,4 @@
 
-
-
 NM_LCA_severity <- function(
     data, iterations, burnin, thin = 1,
     mu_beta = 0,  sd_beta = 5,       
@@ -24,7 +22,8 @@ NM_LCA_severity <- function(
   m_gamma  <- as_lenJ(m_gamma,  "m_gamma")
   sd_gamma <- as_lenJ(sd_gamma, "sd_gamma")
 
-  n_keep <- (iterations - burnin) / thin
+  iterations_tot = iterations + burnin
+  n_keep <- (iterations_tot - burnin) / thin
   n_keep <- as.integer(n_keep)
   
   sample_NM <- function(n, mu0, tau, grid_size = 1e4) {
@@ -149,7 +148,7 @@ NM_LCA_severity <- function(
   }
   
   keep <- 0
-  for (iter in 1:iterations) {
+  for (iter in 1:iterations_tot) {
     
     for (i in 1:N) {
       upd <- DS_flip_NM(i, Tij[i,], Di, Si, beta, gamma, mu0, tau, a_rho, b_rho)

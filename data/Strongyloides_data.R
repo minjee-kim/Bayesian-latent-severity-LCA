@@ -27,7 +27,7 @@ table(data)
 ##################################################################################
 ######### Reproducing the results on Joseph, Dendukuri 2001 page 159 #############
 ##################################################################################
-prior_input = list(
+prior_CI = list(
   prev = c(1,1),  # Beta(1,1) on prevalence
   tests = list(
     list(sens=c(4.44, 13.31), spec=c(71.25, 3.75)),  # Test 1
@@ -35,30 +35,30 @@ prior_input = list(
   )
 )
 fit_CI <- bayes_2LCR(data = data, model="CI",
-                        iterations = 25000, burnin=5000, thin=1,
-                        prior_input=prior_input)
+                        iterations = 200000, burnin=5000, thin=1,
+                        prior_input=prior_CI)
 # saveRDS(fit_CI, "Strongyloides_CI.RDS")
 
-prior_input <- list(
+prior_rand <- list(
   prev = c(1,1),   # Beta(a,b) for prevalence
   tests = list(
     # Test 1 priors (means & SDs)
-    list(a1 = list(mean = -0.811, sd = 0.380),   # class 0
-         a0 = list(mean =  2.171, sd = 0.261),   # class 1
-         b1 = list(mean =  0.668, sd = 0.5),   # class 0 slope
-         b0 = list(mean =  0.861, sd = 0.5)),   # class 1 slope
+    list(a1 = list(mean = -0.811, sd = 0.380),   
+         a0 = list(mean =  -2.171, sd = 0.261),  ## in the paper spec was pnorm(a0/ sqrt(1+b0^2))
+         b1 = list(mean =  0.668, sd = 0.5),  
+         b0 = list(mean =  0.861, sd = 0.5)), 
     # Test 2 priors
     list(a1 = list(mean =  1.012, sd = 0.268),
-         a0 = list(mean =  0.692, sd = 0.560),
-         b1 = list(mean =  0.668, sd = 0.5),           # class 0 slope
+         a0 = list(mean =  -0.692, sd = 0.560),
+         b1 = list(mean =  0.668, sd = 0.5),    
          b0 = list(mean =  0.861, sd = 0.5))
   )
 )
 
 fit_rand <- bayes_2LCR(data = data, model="2LCR1", 
                        common_slopes = FALSE,
-                       iterations = 25000, burnin=5000, thin=1,
-                       prior_input=prior_input)
+                       iterations = 200000, burnin=5000, thin=1,
+                       prior_input=prior_rand)
 
 # saveRDS(fit_rand, "Strongyloides_random.RDS")
 
@@ -75,15 +75,14 @@ ranges <- list(
 
 fitCI <- Bayesian_LCA_severity(
   data       = data,
-  iterations = 500000,
-  burnin     = 500000,
-  thin       = 2,
+  iterations = 500000, 
+  burnin = 500000, 
+  thin = 2,
   severity_prior = list(type="ci"),
-  ranges     = ranges,
-  ci_level   = 0.95,
-  nsim       = 30000
+  ranges  = ranges,               
+  rho_prior  = list(beta = c(1,1))
 )
-saveRDS(fitCI, "Strongyloides_BLS_CI.RDS")
+# saveRDS(fitCI, "Strongyloides_BLS_CI.RDS")
 
 fitGamma <- Bayesian_LCA_severity(
   data       = data,
@@ -91,11 +90,10 @@ fitGamma <- Bayesian_LCA_severity(
   burnin     = 500000,
   thin       = 2,
   severity_prior = list(type="gamma", aS = 3, bS = sqrt(3)),
-  ranges     = ranges,
-  ci_level   = 0.95,
-  nsim       = 30000
+  ranges  = ranges,               
+  rho_prior  = list(beta = c(1,1))
 )
-saveRDS(fitGamma, "Strongyloides_BLS_Gamma.RDS")
+# saveRDS(fitGamma, "Strongyloides_BLS_Gamma.RDS")
 
 fitNM <- Bayesian_LCA_severity(
   data       = data,
@@ -104,10 +102,8 @@ fitNM <- Bayesian_LCA_severity(
   thin       = 2,
   severity_prior = list(type="normal moment", mu0=0, tau=1.48495),
   ranges     = ranges,
-  ci_level   = 0.95,
-  nsim       = 30000
+  rho_prior  = list(beta = c(1,1))
 )
-fitNM$rho_Samples
-saveRDS(fitNM, "Strongyloides_BLS_NM.RDS")
+# saveRDS(fitNM, "Strongyloides_BLS_NM.RDS")
 
 

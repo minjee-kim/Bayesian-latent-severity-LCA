@@ -10,16 +10,17 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
   T_col = ncol(Tij)
   rho = runif(1) 
   Di = rbinom(N, 1, rho)
-  gamma_j = runif(T_col)
+  gamma_j = rnorm(T_col, m_gamma, sd_gamma)
   beta_j = rtruncnorm(T_col, a = 0, b = Inf, mean = 0, sd = 1) # beta_j ~ norm(0, 2^2)
   
   ## initializing samples
-  rho_samples <- rep(NA, (iterations - burnin)/thin)
-  D_samples <- matrix(NA, (iterations - burnin)/thin, N)
-  gamma_samples <- matrix(NA, (iterations - burnin)/thin, T_col)
-  beta_samples <- matrix(NA, (iterations - burnin)/thin, T_col)
-  sensitivity_samples <- matrix(NA, (iterations - burnin)/thin, T_col)
-  specificity_samples <- matrix(NA, (iterations - burnin)/thin, T_col)
+  iterations_tot = iterations + burnin
+  rho_samples <- rep(NA, (iterations_tot - burnin)/thin)
+  D_samples <- matrix(NA, (iterations_tot - burnin)/thin, N)
+  gamma_samples <- matrix(NA, (iterations_tot - burnin)/thin, T_col)
+  beta_samples <- matrix(NA, (iterations_tot - burnin)/thin, T_col)
+  sensitivity_samples <- matrix(NA, (iterations_tot - burnin)/thin, T_col)
+  specificity_samples <- matrix(NA, (iterations_tot - burnin)/thin, T_col)
   
   sample_Vij <- function(Tij, Di, beta_j, gamma_j){
     N = length(Di)
@@ -92,7 +93,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     return(D_new)
   }
   
-  beta_mh <- function(Di, beta_j, Vij, proposal_sd = 0.1, tau2 = 25) {
+  beta_mh <- function(Di, beta_j, Vij, proposal_sd = 0.1, sd_beta = sd_beta) {
     T_col <- length(beta_j)
     N <- length(Di)
     beta_new <- beta_j
@@ -105,14 +106,14 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
       mu_curr <-  beta_curr
       resid_curr <- Vij[idx, j] - mu_curr
       ll_curr <- sum(dnorm(resid_curr, mean = 0, sd = 1, log = TRUE))
-      log_prior_curr <- log(dtruncnorm(beta_curr, a = 0, b = Inf, mean = 1, sd = sqrt(tau2)))
+      log_prior_curr <- log(dtruncnorm(beta_curr, a = 0, b = Inf, mean = m_beta, sd = sd_beta))
       
       # proposal
       beta_prop <- rtruncnorm(1, a = 0, b = Inf, mean = beta_curr, sd = proposal_sd)
       mu_prop <- beta_prop
       resid_prop <- Vij[idx, j] - mu_prop
       ll_prop <- sum(dnorm(resid_prop, mean = 0, sd = 1, log = TRUE))
-      log_prior_prop <- log(dtruncnorm(beta_prop, a = 0, b = Inf, mean = 1, sd = sqrt(tau2)))
+      log_prior_prop <- log(dtruncnorm(beta_prop, a = 0, b = Inf, mean = m_beta, sd = sd_beta))
       
       # asymmetry correction
       log_q_curr_to_prop <- log(dtruncnorm(beta_prop, a = 0, b = Inf, mean = beta_curr, sd = proposal_sd))
@@ -147,7 +148,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
       b <- min(V1) + 0.05
       if (a >= b) next  
       
-      gamma_prop <- rtruncnorm(1, a = a, b = b, mean = gamma_curr, sd = proposal_sd)
+      gamma_prop <- rnorm(1, a = a, b = b, mean = gamma_curr, sd = proposal_sd)
       mu_ij <- beta_j[j] * Di
       
       # Likelihood
@@ -165,8 +166,8 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
       # MH correction for truncated normal proposal
       log_q_curr_to_prop <- log(dtruncnorm(gamma_prop, a = a, b = b, mean = gamma_curr, sd = proposal_sd) + 1e-12)
       log_q_prop_to_curr <- log(dtruncnorm(gamma_curr, a = a, b = b, mean = gamma_prop, sd = proposal_sd) + 1e-12)
-      log_prior_curr <- log(dnorm(gamma_curr, 2.5, 1))
-      log_prior_prop <- log(dnorm(gamma_prop, 2.5, 1))
+      log_prior_curr <- log(dnorm(gamma_curr, m_gamma, sd_gamma))
+      log_prior_prop <- log(dnorm(gamma_prop, m_gamma, sd_gamma))
       
       log_alpha <- (loglik_prop + log_prior_prop) - (loglik_curr + log_prior_curr) +
         (log_q_prop_to_curr - log_q_curr_to_prop)     
@@ -180,7 +181,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
   }
   
   ### MCMC 
-  for(iter in 1:iterations){
+  for(iter in 1:iterations_tot){
     
     ## Di update 
     Di = D_update(rho, Tij, beta_j, gamma_j)
@@ -192,7 +193,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     gamma_j <- gamma_update(Tij, Di, beta_j, gamma_j, Vij, proposal_sd = 0.01)
     
     ## beta_j update
-    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.01, tau2 = 9)
+    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.01, sd_beta = sd_beta)
     
     ## rho update
     rho = rbeta(1, 1 + sum(Di), 1 + (N - sum(Di)))

@@ -1,10 +1,6 @@
 
 
 
-
-
-
-
 Gamma_LCA_severity <- function(data, iterations, burnin, thin = 1,
                                aS = 3, bS = sqrt(3),
                                mu_beta = 1, sd_beta = 5,
@@ -26,14 +22,16 @@ Gamma_LCA_severity <- function(data, iterations, burnin, thin = 1,
   m_gamma  <- as_lenJ(m_gamma,  "m_gamma")
   sd_gamma <- as_lenJ(sd_gamma, "sd_gamma")
   
-  n_keep <- (iterations - burnin) / thin
+  iterations_tot = iterations + burnin
+  n_keep <- (iterations_tot - burnin) / thin
   n_keep <- as.integer(n_keep)
   
   rho <- rbeta(1, a_rho, b_rho)
   Di <- rbinom(N, 1, rho)
-  Si <- ifelse(Di==1, rgamma(sum(Di==1), aS, bS), 0)
+  Si  <- numeric(N)
+  if (any(Di == 1)) Si[Di == 1] <- rgamma(sum(Di==1), shape = aS, rate = bS)
   
-  beta  <- rnorm(J, mu_beta, sd_beta)
+  beta  <- rtruncnorm(J, a=0, b=Inf, mean = mu_beta, sd = sd_beta)
   gamma <- rnorm(J, m_gamma, sd_gamma)
 
   rho_samples  <- rep(NA, n_keep)
@@ -134,7 +132,7 @@ Gamma_LCA_severity <- function(data, iterations, burnin, thin = 1,
   }
   
   keep_idx <- 0L
-  for (iter in 1:iterations) {
+  for (iter in 1:iterations_tot) {
     
     for (i in 1:N) {
       upd <- DS_flip(i, Tij[i,], Di, Si, beta, gamma, aS, bS, a_rho, b_rho)

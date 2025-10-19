@@ -9,13 +9,13 @@ Bayesian_LCA_severity <- function(
     data, iterations, burnin, thin = 1,
     severity = c("CI", "gamma", "nm+"),
     # per-test priors (required): vectors of length J
-    mu_beta,  sd_beta,    # β_j ~ N+(mu_beta[j], sd_beta[j]^2) (truncated at 0)
-    m_gamma,  sd_gamma,   # γ_j ~ N(m_gamma[j], sd_gamma[j]^2)
+    mu_beta,  sd_beta,    # beta_j ~ N+(mu_beta[j], sd_beta[j]^2) (truncated at 0)
+    m_gamma,  sd_gamma,   # gamma_j ~ N(m_gamma[j], sd_gamma[j]^2)
     # prevalence prior
     rho_beta = c(1, 1),   # ρ ~ Beta(a,b)
     # severity hyper (only if not "CI")
-    aS = NULL, bS = NULL, # for gamma S|D=1
-    mu0 = NULL, tau = NULL # for NM+ S|D=1
+    aS = 3, bS = sqrt(3), # for gamma S|D=1
+    mu0 = 0, tau = 1.48495 # for NM+ S|D=1
 ){
   library(truncnorm)
   severity <- match.arg(tolower(severity), c("CI","gamma","nm+"))

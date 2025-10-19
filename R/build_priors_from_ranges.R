@@ -1,105 +1,109 @@
 
 
-# Build per-test priors from Se/Sp ranges, with severity-aware Se calibration.
-# Returns a list of equal-length vectors: mu_beta, sd_beta, m_gamma, sd_gamma.
 build_priors_from_ranges <- function(
     ranges,
     severity = c("CI","gamma","nm+"),
-    aS = 3, bS = sqrt(3),       # for severity="gamma"
-    mu0 = 0, tau = 1.48495,     # for severity="nm+"
-    ci_level = 0.95
+    aS = 3, bS = sqrt(3),
+    mu0 = 0, tau = 1.48495,
+    nsim = 100000,
+    verbose = TRUE
 ){
-  nsim_cal = 40000 # MC size for calibration (gamma/NM+)
-  clamp_sd_beta = 1.5
-  clamp_sd_gamma = 1.5
-  
+  set.seed(123)
   severity <- match.arg(tolower(severity), c("ci","gamma","nm+"))
-  J <- length(ranges); if (J == 0L) stop("ranges must be a non-empty list.")
-  z <- qnorm((1 + ci_level) / 2)
+  J <- length(ranges)
   
-  clamp01 <- function(p) pmin(pmax(p, 1e-4), 1 - 1e-4)
-  clamp   <- function(x, lo, hi) pmin(pmax(x, lo), hi)
+  clamp01 <- function(p) pmin(pmax(p, 1e-6), 1 - 1e-6)
+  qtrunc <- function(u, mean, sd) truncnorm::qtruncnorm(u, a = 0, b = Inf, mean = mean, sd = sd)
   
-  probit_mid_sd <- function(L, U, z) {
-    L <- clamp01(L); U <- clamp01(U)
-    m  <- (qnorm(L) + qnorm(U)) / 2
-    sd <- (qnorm(U) - qnorm(L)) / (2 * z)
-    list(m = m, sd = sd)
+  map_spec_to_gamma <- function(Lsp, Usp){
+    z   <- qnorm(0.975)
+    Lsp <- clamp01(Lsp); Usp <- clamp01(Usp)
+    m_g  <- 0.5 * (qnorm(Lsp) + qnorm(Usp))
+    sd_g <- (qnorm(Usp) - qnorm(Lsp)) / (2*z)
+    c(m_g = m_g, sd_g = sd_g)
   }
   
-  # S samplers for severity models
-  .sample_S <- function(n, severity, aS, bS, mu0, tau){
-    if (severity == "ci")    return(rep(1, n))
-    if (severity == "gamma") return(rgamma(n, shape = aS, rate = bS))
-    # NM+ inverse-CDF sampler
-    x  <- seq(0, mu0 + 6*tau, length.out = 10000L)
+  sample_S_once <- function(sev, n, aS, bS, mu0, tau){
+    if (sev == "ci")    return(rep(1, n))
+    if (sev == "gamma") return(rgamma(n, shape = aS, rate = bS))
+    x  <- seq(0, mu0 + 6*tau, length.out = 10000)
     dx <- x[2] - x[1]
-    dens <- 2*(x^2)/(sqrt(2*pi)*tau^3) * exp(- (x-mu0)^2/(2*tau^2))
+    dens <- 2*(x^2)/(sqrt(2*pi)*tau^3) * exp(- (x - mu0)^2/(2*tau^2))
     dens <- dens / sum(dens*dx)
     cdf  <- cumsum(dens*dx)
     approx(cdf, x, xout = runif(n), rule = 2)$y
   }
   
-  # Calibrate (m_beta, sd_beta) so Se quantiles match [Lse, Use]
-  calibrate_beta_to_Se <- function(Lse, Use, m_gamma, sd_gamma,
-                                   severity, aS, bS, mu0, tau,
-                                   nsim = nsim_cal){
-    stopifnot(0 < Lse, Lse < Use, Use < 1)
-    S <- .sample_S(nsim, severity, aS, bS, mu0, tau)
-    target <- c(L = Lse, U = Use)
-    
-    obj <- function(par){                # par = log(m), log(sd)
-      m  <- exp(par[1]); sd <- exp(par[2])
-      if (!is.finite(m) || !is.finite(sd) || m < 1e-4 || m > 15 || sd < 1e-3 || sd > 5) return(1e6)
-      beta  <- truncnorm::rtruncnorm(nsim, a = 0, b = Inf, mean = m, sd = sd)
-      gamma <- rnorm(nsim, m_gamma, sd_gamma)
-      se    <- pnorm(beta * S - gamma)
-      q     <- quantile(se, c(0.025, 0.975), names = FALSE)
-      sum((q - target)^2)
+  # Common random numbers
+  U_beta  <- runif(nsim)
+  Z_gamma <- rnorm(nsim)
+  S_vec <- sample_S_once(severity, nsim, aS, bS, mu0, tau)
+  
+  make_calibrator <- function(S_vec, U_beta, Z_gamma){
+    function(Lse, Use, m_g, sd_g){
+      zL <- qnorm(clamp01(Lse))
+      zU <- qnorm(clamp01(Use))
+      obj <- function(par){
+        m <- exp(par[1]); s <- exp(par[2])
+        if (!is.finite(m) || !is.finite(s) || s <= 1e-8) return(1e12)
+        beta  <- qtrunc(U_beta, mean = m, sd = s)
+        gamma <- m_g + sd_g * Z_gamma
+        eta   <- beta * S_vec - gamma
+        qs    <- as.numeric(quantile(eta, c(0.025, 0.5, 0.975), names = FALSE))
+        # match tails strongly; nudge median toward the midpoint
+        (qs[1] - zL)^2 + (qs[3] - zU)^2 + 0.1*(qs[2] - 0.5*(zL+zU))^2
+      }
+      inits <- rbind(c(log(1.0), log(0.6)),
+                     c(log(0.4), log(0.4)),
+                     c(log(2.0), log(0.8)),
+                     c(log(3.0), log(1.2)),
+                     c(log(0.5), log(1.5)))
+      best <- list(val = Inf, par = inits[1,])
+      for (k in seq_len(nrow(inits))){
+        o <- optim(inits[k,], obj, method = "Nelder-Mead",
+                   control = list(maxit = 800, reltol = 1e-9))
+        if (is.finite(o$value) && o$value < best$val) best <- list(val = o$value, par = o$par)
+      }
+      c(m_beta = exp(best$par[1]), sd_beta = exp(best$par[2]))
     }
-    o <- optim(c(log(1), log(0.6)), obj, method = "Nelder-Mead",
-               control = list(maxit = 300, reltol = 1e-8))
-    list(m_beta = exp(o$par[1]), sd_beta = exp(o$par[2]), ok = (o$convergence == 0))
+  }
+  calib <- make_calibrator(S_vec, U_beta, Z_gamma)
+  
+  mu_beta <- sd_beta <- m_gamma <- sd_gamma <- numeric(J)
+  for (j in seq_len(J)){
+    rj  <- ranges[[j]]
+    Lsp <- min(rj$spec); Usp <- max(rj$spec)
+    Lse <- min(rj$sens); Use <- max(rj$sens)
+    gg <- map_spec_to_gamma(Lsp, Usp)
+    bb <- calib(Lse, Use, m_g = gg["m_g"], sd_g = gg["sd_g"])
+    m_gamma[j] <- gg["m_g"];  sd_gamma[j] <- gg["sd_g"]
+    mu_beta[j] <- bb["m_beta"]; sd_beta[j] <- bb["sd_beta"]
   }
   
-  m_gamma <- sd_gamma <- mu_beta <- sd_beta <- numeric(J)
-  
-  for (j in seq_len(J)) {
-    rg <- ranges[[j]]
-    if (is.null(rg$spec) || is.null(rg$sens))
-      stop(sprintf("ranges[[%d]] must have $sens and $spec.", j))
-    
-    # From specificity range -> gamma prior (independent of severity)
-    g     <- probit_mid_sd(min(rg$spec), max(rg$spec), z)
-    m_g   <- g$m
-    sd_g  <- clamp(g$sd, 0.02, clamp_sd_gamma)
-  
-    # From sensitivity range -> beta prior (depends on severity)
-    if (severity == "ci") {
-      # CI: Se = Phi(beta - gamma). Use eta = beta - gamma.
-      e     <- probit_mid_sd(min(rg$sens), max(rg$sens), z)
-      m_eta <- e$m
-      sd_eta<- clamp(e$sd, 0.02, clamp_sd_beta)
-      m_b   <- max(0, m_eta + m_g)
-      sd_b  <- clamp(sqrt(sd_eta^2 + sd_g^2), 0.05, clamp_sd_beta)  # simple delta
-    } else {
-      cf  <- calibrate_beta_to_Se(min(rg$sens), max(rg$sens),
-                                  m_gamma = m_g, sd_gamma = sd_g,
-                                  severity = severity, aS = aS, bS = bS, mu0 = mu0, tau = tau)
-      m_b  <- cf$m_beta
-      sd_b <- cf$sd_beta
-    }
-    
-    m_gamma[j] <- m_g
-    sd_gamma[j] <- sd_g
-    mu_beta[j] <- m_b
-    sd_beta[j] <- sd_b
+  if (verbose) {
+    # Reuse the SAME S_vec used in calibration
+    rows <- lapply(seq_len(J), function(j) {
+      beta  <- truncnorm::rtruncnorm(nsim, a = 0, b = Inf, mean = mu_beta[j], sd = sd_beta[j])
+      gamma <- stats::rnorm(nsim, mean = m_gamma[j], sd = sd_gamma[j])
+      Se <- stats::pnorm(beta * S_vec - gamma)
+      Sp <- stats::pnorm(gamma)
+      qSe <- stats::quantile(Se, c(0.025, 0.50, 0.975), names = FALSE)
+      qSp <- stats::quantile(Sp, c(0.025, 0.50, 0.975), names = FALSE)
+      data.frame(
+        Test=j,
+        beta_mu=round(mu_beta[j],3), beta_sd=round(sd_beta[j],3),
+        gamma_mu=round(m_gamma[j],3), gamma_sd=round(sd_gamma[j],3),
+        Se_q025=round(qSe[1],3), Se_q50=round(qSe[2],3), Se_q975=round(qSe[3],3),
+        Sp_q025=round(qSp[1],3), Sp_q50=round(qSp[2],3), Sp_q975=round(qSp[3],3)
+      )
+    })
+    cat("\n================ PRIOR CHECK (", toupper(severity), ") =================\n", sep = "")
+    print(do.call(rbind, rows))
   }
   
-  list(
-    mu_beta  = mu_beta,
-    sd_beta  = sd_beta,
-    m_gamma  = m_gamma,
-    sd_gamma = sd_gamma
-  )
+  list(mu_beta = mu_beta, sd_beta = sd_beta,
+       m_gamma = m_gamma, sd_gamma = sd_gamma)
 }
+
+
+

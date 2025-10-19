@@ -87,28 +87,39 @@ plot_prior_vs_posterior <- function(fit, priors, nsim = 20000) {
   post_rho <- tibble::tibble(value = rho_post, quantity = "rho",
                              test = "global", type = "Posterior")
   
-  dat <- dplyr::bind_rows(prior_tb, post_tb, prior_rho, post_rho) |>
-    dplyr::filter(is.finite(value))
+  dat <- dplyr::bind_rows(prior_tb, post_tb, prior_rho, post_rho) %>%
+    dplyr::filter(is.finite(value)) %>%
+    dplyr::mutate(
+      type = stringr::str_trim(type),
+      type = stringr::str_to_title(type),         
+      type = factor(type, levels = c("Prior","Posterior"))
+    )
   
-  p_rho <- dat |>
-    dplyr::filter(quantity == "rho") |>
-    ggplot2::ggplot(ggplot2::aes(x = value, fill = type)) +
-    ggplot2::geom_density(alpha = 0.35, adjust = 1.2) +
+  dat <- dat %>%
+    dplyr::filter(is.finite(value)) %>%
+    dplyr::mutate(
+      type = stringr::str_to_title(trimws(type)),
+      type = factor(type, levels = c("Prior","Posterior"))
+    )
+  
+  p_rho <- dat %>%
+    dplyr::filter(quantity == "rho") %>%
+    ggplot2::ggplot(ggplot2::aes(x = value, fill = type, color = type)) +  # <- color mapped
+    ggplot2::geom_density(alpha = 0.18, linewidth = 0.6, adjust = 1.2) +
     ggplot2::labs(x = expression(rho), y = "Density",
                   title = "Prevalence (\u03C1): Prior vs Posterior",
-                  fill = NULL) +
+                  fill = NULL, color = NULL) +
     ggplot2::theme_minimal()
   
-  p_tests <- dat |>
-    dplyr::filter(quantity != "rho") |>
-    ggplot2::ggplot(ggplot2::aes(x = value, fill = type)) +
-    ggplot2::geom_density(alpha = 0.35, adjust = 1.2) +
+  p_tests <- dat %>%
+    dplyr::filter(quantity != "rho") %>%
+    ggplot2::ggplot(ggplot2::aes(x = value, fill = type, color = type)) +  # <- color mapped
+    ggplot2::geom_density(alpha = 0.18, linewidth = 0.6, adjust = 1.2) +
     ggplot2::facet_grid(quantity ~ test, scales = "free_y") +
     ggplot2::labs(x = "Probability", y = "Density",
                   title = "Se/Sp: Prior vs Posterior",
-                  fill = NULL) +
-    ggplot2::theme_minimal()
-  
+                  fill = NULL, color = NULL) +
+    ggplot2::theme_minimal()  
   list(per_test = p_tests, rho = p_rho)
 }
 

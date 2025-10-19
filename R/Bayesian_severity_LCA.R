@@ -18,7 +18,7 @@ Bayesian_LCA_severity <- function(
     mu0 = 0, tau = 1.48495 # for NM+ S|D=1
 ){
   library(truncnorm)
-  severity <- match.arg(tolower(severity), c("CI","gamma","nm+"))
+  severity <- match.arg(tolower(severity), c("ci","gamma","nm+"))
   if (!all(data %in% c(0,1))) stop("data must be 0/1.")
   
   # Input sanity
@@ -73,7 +73,7 @@ Bayesian_LCA_severity <- function(
   }
   
   
-  if (severity == "CI") {
+  if (severity == "ci") {
     return(CI_LCA_probit(
       data       = data,
       iterations = iterations,

@@ -80,7 +80,7 @@ Bayesian_LCA_severity <- function(
       iterations = iterations,
       burnin     = burnin,
       thin       = thin,
-      m_beta     = mu_beta,
+      mu_beta     = mu_beta,
       sd_beta    = sd_beta,
       m_gamma    = m_gamma,
       sd_gamma   = sd_gamma,

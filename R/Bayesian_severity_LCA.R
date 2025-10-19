@@ -3,6 +3,7 @@
 source("Gamma_LCA_severity.R")
 source("NM_LCA_severity.R")
 source("CI_LCA_probit.R")
+source("build_priors_from_ranges.R")
 
 Bayesian_LCA_severity <- function(
     data, iterations, burnin, thin = 1,

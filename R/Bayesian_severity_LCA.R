@@ -19,6 +19,7 @@ Bayesian_LCA_severity <- function(
 ){
   library(truncnorm)
   severity <- match.arg(tolower(severity), c("ci","gamma","nm+"))
+  data = as.matrix(data)
   if (!all(data %in% c(0,1))) stop("data must be 0/1.")
   
   # Input sanity

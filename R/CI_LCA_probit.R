@@ -93,92 +93,85 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     return(D_new)
   }
   
-  beta_mh <- function(Di, beta_j, Vij, proposal_sd = 0.1, sd_beta = sd_beta) {
+  beta_mh <- function(Di, beta_j, Vij, proposal_sd, m_beta, sd_beta) {
     T_col <- length(beta_j)
-    N <- length(Di)
     beta_new <- beta_j
-    
+    idx <- which(Di == 1L)
     for (j in 1:T_col) {
-      idx <- which(Di == 1)
-      if (length(idx) == 0) next  # no info for this beta
-      
+      if (length(idx) == 0) next
       beta_curr <- beta_j[j]
-      mu_curr <-  beta_curr
-      resid_curr <- Vij[idx, j] - mu_curr
-      ll_curr <- sum(dnorm(resid_curr, mean = 0, sd = 1, log = TRUE))
-      log_prior_curr <- log(dtruncnorm(beta_curr, a = 0, b = Inf, mean = m_beta, sd = sd_beta))
+      resid_curr <- Vij[idx, j] - beta_curr  # mu = beta for D=1
+      ll_curr <- sum(dnorm(resid_curr, 0, 1, log = TRUE))
       
-      # proposal
+      m_bj  <- if (length(m_beta)  > 1) m_beta[j]  else m_beta
+      sd_bj <- if (length(sd_beta) > 1) sd_beta[j] else sd_beta
+      
+      log_prior_curr <- log(dtruncnorm(beta_curr, a = 0, b = Inf, mean = m_bj, sd = sd_bj))
+      
       beta_prop <- rtruncnorm(1, a = 0, b = Inf, mean = beta_curr, sd = proposal_sd)
-      mu_prop <- beta_prop
-      resid_prop <- Vij[idx, j] - mu_prop
-      ll_prop <- sum(dnorm(resid_prop, mean = 0, sd = 1, log = TRUE))
-      log_prior_prop <- log(dtruncnorm(beta_prop, a = 0, b = Inf, mean = m_beta, sd = sd_beta))
+      resid_prop <- Vij[idx, j] - beta_prop
+      ll_prop <- sum(dnorm(resid_prop, 0, 1, log = TRUE))
+      log_prior_prop <- log(dtruncnorm(beta_prop, a = 0, b = Inf, mean = m_bj, sd = sd_bj))
       
-      # asymmetry correction
-      log_q_curr_to_prop <- log(dtruncnorm(beta_prop, a = 0, b = Inf, mean = beta_curr, sd = proposal_sd))
-      log_q_prop_to_curr <- log(dtruncnorm(beta_curr, a = 0, b = Inf, mean = beta_prop, sd = proposal_sd))
+      log_q_cp <- log(dtruncnorm(beta_prop, a = 0, b = Inf, mean = beta_curr, sd = proposal_sd))
+      log_q_pc <- log(dtruncnorm(beta_curr, a = 0, b = Inf, mean = beta_prop, sd = proposal_sd))
       
-      log_alpha <- (ll_prop + log_prior_prop + log_q_prop_to_curr) -
-        (ll_curr + log_prior_curr + log_q_curr_to_prop)
+      log_alpha <- (ll_prop + log_prior_prop + log_q_pc) -
+        (ll_curr + log_prior_curr + log_q_cp)
       
-      if (log(runif(1)) < log_alpha) {
-        beta_new[j] <- beta_prop
-      }
+      if (is.finite(log_alpha) && log(runif(1)) < log_alpha) beta_new[j] <- beta_prop
     }
-    
-    return(beta_new)
+    beta_new
   }
   
-  gamma_update <- function(Tij, Di, beta_j, gamma_j, Vij, proposal_sd = 0.1) {
-    N <- nrow(Tij)
-    T_col <- ncol(Tij)
-    
+  
+  gamma_update <- function(Tij, Di, beta_j, gamma_j, Vij, proposal_sd = 0.1,
+                           m_gamma, sd_gamma) {
+    N <- nrow(Tij); T_col <- ncol(Tij)
     for (j in 1:T_col) {
       gamma_curr <- gamma_j[j]
       
-      # Partition Vj by observed Tij
+      # bounds from truncated-normal augmentation
       Vj <- Vij[, j]
       V0 <- Vj[Tij[, j] == 0]
       V1 <- Vj[Tij[, j] == 1]
+      if (length(V0) == 0L || length(V1) == 0L) next
       
-      if (length(V0) == 0 || length(V1) == 0) next  # Skip if bounds can't be computed
+      a <- max(V0) - 0.05; b <- min(V1) + 0.05
+      if (a >= b) next
       
-      a <- max(V0) - 0.05
-      b <- min(V1) + 0.05
-      if (a >= b) next  
+      gamma_prop <- rtruncnorm(1, a = a, b = b, mean = gamma_curr, sd = proposal_sd)
       
-      gamma_prop <- rnorm(1, a = a, b = b, mean = gamma_curr, sd = proposal_sd)
-      mu_ij <- beta_j[j] * Di
+      mu_ij  <- beta_j[j] * Di
+      z_curr <- gamma_curr - mu_ij
+      z_prop <- gamma_prop - mu_ij
       
-      # Likelihood
-      z_curr <- (gamma_curr - mu_ij) 
-      z_prop <- (gamma_prop - mu_ij) 
+      loglik_curr <- sum(ifelse(Tij[, j] == 1, log1p(-pnorm(z_curr)),
+                                log(pmax(pnorm(z_curr), 1e-12))))
+      loglik_prop <- sum(ifelse(Tij[, j] == 1, log1p(-pnorm(z_prop)),
+                                log(pmax(pnorm(z_prop), 1e-12))))
       
-      loglik_curr <- sum(ifelse(Tij[, j] == 1,
-                                log1p(-pnorm(z_curr)),
-                                log(pnorm(z_curr) + 1e-10)))
+      # per-test hyperparameters (support scalar or vector inputs)
+      m_gj  <- if (length(m_gamma)  > 1) m_gamma[j]  else m_gamma
+      sd_gj <- if (length(sd_gamma) > 1) sd_gamma[j] else sd_gamma
       
-      loglik_prop <- sum(ifelse(Tij[, j] == 1,
-                                log1p(-pnorm(z_prop)),
-                                log(pnorm(z_prop) + 1e-10)))
+      log_prior_curr <- dnorm(gamma_curr, mean = m_gj,  sd = sd_gj, log = TRUE)
+      log_prior_prop <- dnorm(gamma_prop, mean = m_gj,  sd = sd_gj, log = TRUE)
       
-      # MH correction for truncated normal proposal
       log_q_curr_to_prop <- log(dtruncnorm(gamma_prop, a = a, b = b, mean = gamma_curr, sd = proposal_sd) + 1e-12)
       log_q_prop_to_curr <- log(dtruncnorm(gamma_curr, a = a, b = b, mean = gamma_prop, sd = proposal_sd) + 1e-12)
-      log_prior_curr <- log(dnorm(gamma_curr, m_gamma, sd_gamma))
-      log_prior_prop <- log(dnorm(gamma_prop, m_gamma, sd_gamma))
       
-      log_alpha <- (loglik_prop + log_prior_prop) - (loglik_curr + log_prior_curr) +
-        (log_q_prop_to_curr - log_q_curr_to_prop)     
+      log_alpha <- (loglik_prop + log_prior_prop + log_q_prop_to_curr) -
+        (loglik_curr + log_prior_curr + log_q_curr_to_prop)
       
-      if (log(runif(1)) < log_alpha && gamma_prop <= 5) {
+      # both comparisons are scalars now
+      if (is.finite(log_alpha) && (log(runif(1)) < log_alpha) && (gamma_prop <= 5)) {
         gamma_j[j] <- gamma_prop
       }
     }
-    
-    return(gamma_j)
+    gamma_j
   }
+  
   
   ### MCMC 
   for(iter in 1:iterations_tot){
@@ -190,10 +183,11 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     Vij <- sample_Vij(Tij, Di, beta_j, gamma_j)
     
     ## gamma_j update 
-    gamma_j <- gamma_update(Tij, Di, beta_j, gamma_j, Vij, proposal_sd = 0.01)
+    gamma_j <- gamma_update(Tij, Di, beta_j, gamma_j, Vij, proposal_sd = 0.01,
+                            m_gamma = m_gamma, sd_gamma = sd_gamma)
     
     ## beta_j update
-    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.01, sd_beta = sd_beta)
+    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.01, m_beta = m_beta, sd_beta = sd_beta)    
     
     ## rho update
     rho = rbeta(1, 1 + sum(Di), 1 + (N - sum(Di)))

@@ -73,37 +73,49 @@ ranges <- list(
   list(sens=c(0.63, 0.92), spec=c(0.31, 0.96))   # test 2
 )
 
-fitCI <- Bayesian_LCA_severity(
-  data       = data,
-  iterations = 500000, 
-  burnin = 500000, 
-  thin = 2,
-  severity_prior = list(type="ci"),
-  ranges  = ranges,               
-  rho_prior  = list(beta = c(1,1))
+pr_CI <- build_priors_from_ranges(ranges, severity="CI")
+CI_fitBLS_CI <- Bayesian_LCA_severity(
+  data       = Tij,
+  iterations = 200000,
+  burnin     = 50000,
+  thin       = 100,
+  severity   = "CI",   
+  mu_beta    = pr_CI$mu_beta,
+  sd_beta    = pr_CI$sd_beta,
+  m_gamma    = pr_CI$m_gamma,
+  sd_gamma   = pr_CI$sd_gamma,
+  rho_beta   = c(1,1)
 )
-# saveRDS(fitCI, "Strongyloides_BLS_CI.RDS")
+saveRDS(fitCI, "Strongyloides_BLS_CI.RDS")
 
+pr_gamma <- build_priors_from_ranges(ranges, severity="gamma", aS=3, bS=sqrt(3))
 fitGamma <- Bayesian_LCA_severity(
-  data       = data,
-  iterations = 500000,
-  burnin     = 500000,
-  thin       = 2,
-  severity_prior = list(type="gamma", aS = 3, bS = sqrt(3)),
-  ranges  = ranges,               
-  rho_prior  = list(beta = c(1,1))
+  data       = Tij,
+  iterations = 200000,
+  burnin     = 20000,
+  thin       = 100,
+  severity   = "gamma",   
+  mu_beta    = pr_gamma$mu_beta,
+  sd_beta    = pr_gamma$sd_beta,
+  m_gamma    = pr_gamma$m_gamma,
+  sd_gamma   = pr_gamma$sd_gamma,
+  rho_beta   = c(1,1)
 )
-# saveRDS(fitGamma, "Strongyloides_BLS_Gamma.RDS")
+saveRDS(fitGamma, "Strongyloides_BLS_Gamma.RDS")
 
+pr_nm <- build_priors_from_ranges(ranges, severity="nm+", mu0 = 0, tau = 1.48495)
 fitNM <- Bayesian_LCA_severity(
-  data       = data,
-  iterations = 500000,
-  burnin     = 500000,
-  thin       = 2,
-  severity_prior = list(type="normal moment", mu0=0, tau=1.48495),
-  ranges     = ranges,
-  rho_prior  = list(beta = c(1,1))
+  data       = Tij,
+  iterations = 200000,
+  burnin     = 20000,
+  thin       = 100,
+  severity   = "nm+",   
+  mu_beta    = pr_nm$mu_beta,
+  sd_beta    = pr_nm$sd_beta,
+  m_gamma    = pr_nm$m_gamma,
+  sd_gamma   = pr_nm$sd_gamma,
+  rho_beta   = c(1,1)
 )
-# saveRDS(fitNM, "Strongyloides_BLS_NM.RDS")
+saveRDS(fitNM, "Strongyloides_BLS_NM.RDS")
 
 

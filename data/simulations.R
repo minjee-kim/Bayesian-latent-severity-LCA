@@ -19,8 +19,7 @@ S <- ifelse(D==1, 1, 0)
 Mu <- outer(D*S, beta_true) - matrix(gamma_true, N, J, byrow=TRUE)
 Tij <- matrix( rbinom(N*J, 1, pnorm(Mu)), nrow=N, ncol=J)
 
-# Per-test prior ranges for Se/Sp (interpreted as 95% intervals)
-
+################## Bayesian RE Models########################################
 prior_2LCR <- list(
   prev = c(1,1),
   ranges = list(
@@ -32,13 +31,13 @@ prior_2LCR <- list(
   range_ci = 0.95
 )
 CI_bayes2LCR_CI <- bayes_2LCR(data = Tij, model="CI",
-                     iterations = 200000 + 200000, burnin=200000, thin=1,
+                     iterations = 200000, burnin=200000, thin=1,
                      prior_input = prior_2LCR )
 # saveRDS(CI_bayes2LCR_CI, "CIsim_bayes2LCR_CI.RDS")
 
 CI_bayes2LCR_RE <- bayes_2LCR(
   data = Tij, model = "random",
-  iterations = 200000 + 200000,  # total iters
+  iterations = 200000, 
   burnin = 200000,
   thin = 20,
   prior_input = prior_2LCR,
@@ -46,43 +45,54 @@ CI_bayes2LCR_RE <- bayes_2LCR(
 )
 # saveRDS(CI_bayes2LCR_RE, "CIsim_bayes2LCR_RE.RDS")
 
-## Our models
+################## Our Models########################################
 ranges <- list(
   list(sens=c(0.20, 0.99), spec=c(0.30, 0.999)), # test 1
   list(sens=c(0.20, 0.99), spec=c(0.30, 0.999)), # test 2
   list(sens=c(0.20, 0.99), spec=c(0.30, 0.999)), # test 3
   list(sens=c(0.20, 0.99), spec=c(0.30, 0.999))  # test 4
 )
+pr <- build_priors_from_ranges(ranges)
+
 CI_fitBLS_CI <- Bayesian_LCA_severity(
   data       = Tij,
-  iterations = 200000,
-  burnin     = 200000,
-  thin       = 2,
-  severity_prior = list(type="ci"),
-  ranges     = ranges,
-  rho_prior  = list(beta = c(1,1))
+  iterations = 20000,
+  burnin     = 2000,
+  thin       = 100,
+  severity   = "CI",   
+  mu_beta    = pr$mu_beta,
+  sd_beta    = pr$sd_beta,
+  m_gamma    = pr$m_gamma,
+  sd_gamma   = pr$sd_gamma,
+  rho_beta   = c(1,1)
 )
 saveRDS(CI_fitBLS_CI, "CIsim_fitBLS_CI.RDS")
 
 CI_fitBLS_Gamma <- Bayesian_LCA_severity(
   data       = Tij,
-  iterations = 200000,
-  burnin     = 200000,
-  thin       = 2,
-  severity_prior = list(type="gamma", aS=3, bS=sqrt(3)),
-  ranges     = ranges,
-  rho_prior  = list(beta = c(1,1))
+  iterations = 20000,
+  burnin     = 2000,
+  thin       = 100,
+  severity   = "gamma",   
+  mu_beta    = pr$mu_beta,
+  sd_beta    = pr$sd_beta,
+  m_gamma    = pr$m_gamma,
+  sd_gamma   = pr$sd_gamma,
+  rho_beta   = c(1,1)
 )
 saveRDS(CI_fitBLS_Gamma, "CIsim_fitBLS_Gamma.RDS")
 
 CI_fitBLS_NM <- Bayesian_LCA_severity(
   data       = Tij,
-  iterations = 200000,
-  burnin     = 200000,
-  thin       = 2,
-  severity_prior = list(type="normal moment", mu0=0, tau=1.48495),
-  ranges     = ranges,
-  rho_prior  = list(beta = c(1,1))
+  iterations = 20000,
+  burnin     = 2000,
+  thin       = 100,
+  severity   = "nm+",   
+  mu_beta    = pr$mu_beta,
+  sd_beta    = pr$sd_beta,
+  m_gamma    = pr$m_gamma,
+  sd_gamma   = pr$sd_gamma,
+  rho_beta   = c(1,1)
 )
 saveRDS(CI_fitBLS_NM, "CIsim_fitBLS_NM.RDS")
 

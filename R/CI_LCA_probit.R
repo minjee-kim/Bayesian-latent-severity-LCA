@@ -1,7 +1,7 @@
 
 
 CI_LCA_probit <- function(data, iterations, burnin, thin=1,
-                          m_beta, sd_beta,  # beta_j: probit Se_j
+                          mu_beta, sd_beta,  # beta_j: probit Se_j
                           m_gamma, sd_gamma, # gamma_j: probit Sp_j
                           a_rho=1, b_rho=1){
   
@@ -93,7 +93,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     return(D_new)
   }
   
-  beta_mh <- function(Di, beta_j, Vij, proposal_sd, m_beta, sd_beta) {
+  beta_mh <- function(Di, beta_j, Vij, proposal_sd, mu_beta, sd_beta) {
     T_col <- length(beta_j)
     beta_new <- beta_j
     idx <- which(Di == 1L)
@@ -103,7 +103,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
       resid_curr <- Vij[idx, j] - beta_curr  # mu = beta for D=1
       ll_curr <- sum(dnorm(resid_curr, 0, 1, log = TRUE))
       
-      m_bj  <- if (length(m_beta)  > 1) m_beta[j]  else m_beta
+      m_bj  <- if (length(mu_beta)  > 1) mu_beta[j]  else mu_beta
       sd_bj <- if (length(sd_beta) > 1) sd_beta[j] else sd_beta
       
       log_prior_curr <- log(dtruncnorm(beta_curr, a = 0, b = Inf, mean = m_bj, sd = sd_bj))
@@ -187,7 +187,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
                             m_gamma = m_gamma, sd_gamma = sd_gamma)
     
     ## beta_j update
-    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.01, m_beta = m_beta, sd_beta = sd_beta)    
+    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.01, mu_beta = mu_beta, sd_beta = sd_beta)    
     
     ## rho update
     rho = rbeta(1, 1 + sum(Di), 1 + (N - sum(Di)))

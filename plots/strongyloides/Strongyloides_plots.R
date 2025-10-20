@@ -14,8 +14,10 @@ source("plot_prior_vs_posterior.R")
 fit_RE_CI   <- readRDS("Strongyloides_CI.RDS")         # Bayesian Random Effect: CI
 fit_RE_RAND <- readRDS("Strongyloides_random.RDS")     # Bayesian Random Effect: Random Effect
 fit_BLS_CI    <- readRDS("Strongyloides_BLS_CI.RDS")   # Our Model: CI
-fit_BLS_Gamma <- readRDS("Strongyloides_BLS_Gamma.RDS")# Our Model: Gamma
+fit_BLS_Gamma <- readRDS("Strongyloides_BLS_Gamma3.RDS")# Our Model: Gamma
+fit_BLS_Gamma4.5 <- readRDS("Strongyloides_BLS_Gamma4.5.RDS")# Our Model: Gamma
 fit_BLS_NM    <- readRDS("Strongyloides_BLS_NM.RDS")   # Our Model: NM+
+fit_BLS_NM01    <- readRDS("Strongyloides_BLS_NM01.RDS")   # Our Model: NM+
 
 ################# Dendukuri & Joseph Bayesian RE ############
 theme_pub <- function() theme_bw(base_size = 12) +
@@ -180,9 +182,11 @@ quantile(fit_RE_RAND$b1[,1], c(0.5, 0.025, 0.975))
 ################# Our Model ############
 quantile(fit_BLS_CI$rho_Samples, c(0.5, 0.025, 0.975))
 quantile(fit_BLS_Gamma$rho_Samples, c(0.5, 0.025, 0.975))
+quantile(fit_BLS_Gamma4.5$rho_Samples, c(0.5, 0.025, 0.975))
 quantile(fit_BLS_NM$rho_Samples, c(0.5, 0.025, 0.975))
 
 quantile(fit_BLS_Gamma$sensitivity_Samples[,1], c(0.5, 0.025, 0.975))
+quantile(fit_BLS_Gamma4.5$sensitivity_Samples[,1], c(0.5, 0.025, 0.975))
 
 
 theme_pub <- function() theme_bw(base_size = 12) +
@@ -192,79 +196,38 @@ theme_pub <- function() theme_bw(base_size = 12) +
 fill_sc  <- scale_fill_manual(values = c(Prior = "grey70", Posterior = "steelblue"))
 color_sc <- scale_color_manual(values = c(Prior = "grey45", Posterior = "steelblue4"))
 
-row_from_fit <- function(fit, priors, title_left, title_right, nsim = 20000, widths = c(1, 3)) {
-  pp <- plot_prior_vs_posterior(fit, priors = priors, nsim = nsim)
+row_from_fit <- function(fit, title_left, title_right, nsim = 20000, widths = c(1, 3)) {
+  pp <- plot_prior_vs_posterior(fit,nsim = nsim)
   p_l <- pp$rho      + ggplot2::labs(title = title_left)  + fill_sc + color_sc + theme_pub()
   p_r <- pp$per_test + ggplot2::labs(title = title_right) + fill_sc + color_sc + theme_pub()
   (patchwork::wrap_plots(p_l, p_r, nrow = 1, widths = widths)) & theme_pub()
 }
 
-ranges <- list(
-  list(sens=c(0.07, 0.47), spec=c(0.89, 0.99)),   # test 1
-  list(sens=c(0.63, 0.92), spec=c(0.31, 0.96))   # test 2
-)
-
-as_priors_CI <- function(pr_vecs, rho_ab = c(a = 1, b = 1)){
-  J <- length(pr_vecs$mu_beta)
-  list(
-    severity_prior = list(type = "ci"),
-    rho_prior      = rho_ab,
-    per_test       = lapply(seq_len(J), function(j) list(
-      m_beta   = pr_vecs$mu_beta[j],
-      sd_beta  = pr_vecs$sd_beta[j],
-      m_gamma  = pr_vecs$m_gamma[j],
-      sd_gamma = pr_vecs$sd_gamma[j]
-    ))
-  )
-}
-pr_CI <- build_priors_from_ranges(ranges, severity="CI")
-priors_CI <- as_priors_CI(pr_CI, rho_ab = c(a = 1, b = 1))
-row_CI    <- row_from_fit(fit_BLS_CI, priors_CI, 
+row_CI <- row_from_fit(fit_BLS_CI, 
                           title_left  = "BLS–CI: Prevalence (ρ)",
                           title_right = "BLS–CI: Sensitivity (Se) and Specificity (Sp)",
-                          nsim = 20000, widths = c(0.5, 0.5))
+                          nsim = 2000000, widths = c(0.5, 0.5))
 
-
-
-pr_gamma <- build_priors_from_ranges(ranges, severity="gamma", aS=3, bS=sqrt(3))
-as_priors_gamma <- function(pr_gamma, aS = 3, bS = sqrt(3), rho_ab = c(a=1,b=1)){
-  J <- length(pr_vecs$mu_beta)
-  list(
-    severity_prior = list(type = "gamma", aS = aS, bS = bS),
-    rho_prior      = rho_ab,
-    per_test       = lapply(seq_len(J), function(j) list(
-      m_beta   = pr_vecs$mu_beta[j],
-      sd_beta  = pr_vecs$sd_beta[j],
-      m_gamma  = pr_vecs$m_gamma[j],
-      sd_gamma = pr_vecs$sd_gamma[j]
-    ))
-  )
-}
-priors_Gamma <- as_priors_CI(pr_gamma)
-row_Gamma <- row_from_fit(fit_BLS_Gamma, priors_Gamma, 
+row_Gamma <- row_from_fit(fit_BLS_Gamma3, 
                           title_left  = "BLS–Gamma: Prevalence (ρ)",
                           title_right = "BLS–Gamma: Sensitivity (Se) and Specificity (Sp)",
-                          nsim = 20000, widths = c(0.5, 0.5))
+                          nsim = 2000000, widths = c(0.5, 0.5))
 
-as_priors_nm <- function(pr_vecs, mu0 = 0, tau = 1.48495, rho_ab = c(a=1,b=1)){
-  J <- length(pr_vecs$mu_beta)
-  list(
-    severity_prior = list(type = "nm+", mu0 = mu0, tau = tau),
-    rho_prior      = rho_ab,
-    per_test       = lapply(seq_len(J), function(j) list(
-      m_beta   = pr_vecs$mu_beta[j],
-      sd_beta  = pr_vecs$sd_beta[j],
-      m_gamma  = pr_vecs$m_gamma[j],
-      sd_gamma = pr_vecs$sd_gamma[j]
-    ))
-  )
-}
-pr_nm <- build_priors_from_ranges(ranges, severity="nm+", mu0 = 0, tau = 1.48495)
-priors_nm = as_priors_nm(pr_nm)
-row_NM    <- row_from_fit(fit_BLS_NM, priors_nm, 
+row_Gamma4.5 <- row_from_fit(fit_BLS_Gamma4.5, 
+                          title_left  = "BLS–Gamma: Prevalence (ρ)",
+                          title_right = "BLS–Gamma: Sensitivity (Se) and Specificity (Sp)",
+                          nsim = 2000000, widths = c(0.5, 0.5))
+
+row_NM    <- row_from_fit(fit_BLS_NM, 
                           title_left  = "BLS–NM+: Prevalence (ρ)",
                           title_right = "BLS–NM+: Sensitivity (Se) and Specificity (Sp)",
-                          nsim = 20000, widths = c(0.5, 0.5))
+                          nsim = 2000000, widths = c(0.5, 0.5))
+
+row_NM01    <- row_from_fit(fit_BLS_NM01, 
+                          title_left  = "BLS–NM+: Prevalence (ρ)",
+                          title_right = "BLS–NM+: Sensitivity (Se) and Specificity (Sp)",
+                          nsim = 2000000, widths = c(0.5, 0.5))
+
 
 # 3) Stack the three rows and collect a single legend
 BLS_grid <- row_CI / row_Gamma / row_NM + patchwork::plot_layout(guides = "collect")

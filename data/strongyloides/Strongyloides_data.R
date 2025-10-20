@@ -35,7 +35,7 @@ prior_CI = list(
   )
 )
 fit_CI <- bayes_2LCR(data = data, model="CI",
-                        iterations = 200000, burnin=5000, thin=1,
+                        iterations = 200000, burnin=50000, thin=1,
                         prior_input=prior_CI)
 # saveRDS(fit_CI, "Strongyloides_CI.RDS")
 
@@ -57,7 +57,7 @@ prior_rand <- list(
 
 fit_rand <- bayes_2LCR(data = data, model="2LCR1", 
                        common_slopes = FALSE,
-                       iterations = 200000, burnin=5000, thin=1,
+                       iterations = 200000, burnin=50000, thin=1,
                        prior_input=prior_rand)
 
 # saveRDS(fit_rand, "Strongyloides_random.RDS")
@@ -77,7 +77,7 @@ pr_CI <- build_priors_from_ranges(ranges, severity="CI")
 fitBLS_CI <- Bayesian_LCA_severity(
   data       = data,
   iterations = 200000,
-  burnin     = 50000,
+  burnin     = 100000,
   thin       = 100,
   severity   = "CI",   
   mu_beta    = pr_CI$mu_beta,
@@ -92,7 +92,7 @@ pr_gamma <- build_priors_from_ranges(ranges, severity="gamma", aS=3, bS=sqrt(3))
 fitBLS_Gamma <- Bayesian_LCA_severity(
   data       = data,
   iterations = 200000,
-  burnin     = 50000,
+  burnin     = 100000,
   thin       = 100,
   severity   = "gamma",   
   mu_beta    = pr_gamma$mu_beta,
@@ -101,13 +101,29 @@ fitBLS_Gamma <- Bayesian_LCA_severity(
   sd_gamma   = pr_gamma$sd_gamma,
   rho_beta   = c(1,1)
 )
-saveRDS(fitBLS_Gamma, "Strongyloides_BLS_Gamma.RDS")
+saveRDS(fitBLS_Gamma, "Strongyloides_BLS_Gamma3.RDS")
+
+pr_gamma4.5 <- build_priors_from_ranges(ranges, severity="gamma", aS=4.5, bS=sqrt(4.5))
+fitBLS_Gamma4.5 <- Bayesian_LCA_severity(
+  data       = data,
+  iterations = 200000,
+  burnin     = 100000,
+  thin       = 100,
+  severity   = "gamma",   
+  mu_beta    = pr_gamma4.5$mu_beta,
+  sd_beta    = pr_gamma4.5$sd_beta,
+  m_gamma    = pr_gamma4.5$m_gamma,
+  sd_gamma   = pr_gamma4.5$sd_gamma,
+  rho_beta   = c(1,1),
+  aS = 4.5, bS = sqrt(4.5)
+)
+saveRDS(fitBLS_Gamma4.5, "Strongyloides_BLS_Gamma4.5.RDS")
 
 pr_nm <- build_priors_from_ranges(ranges, severity="nm+", mu0 = 0, tau = 1.48495)
 fitBLS_NM <- Bayesian_LCA_severity(
   data       = data,
   iterations = 200000,
-  burnin     = 50000,
+  burnin     = 100000,
   thin       = 100,
   severity   = "nm+",   
   mu_beta    = pr_nm$mu_beta,
@@ -118,4 +134,18 @@ fitBLS_NM <- Bayesian_LCA_severity(
 )
 saveRDS(fitBLS_NM, "Strongyloides_BLS_NM.RDS")
 
-
+pr_nm01 <- build_priors_from_ranges(ranges, severity="nm+", mu0 = 0, tau = 1)
+fitBLS_NM01 <- Bayesian_LCA_severity(
+  data       = data,
+  iterations = 200000,
+  burnin     = 100000,
+  thin       = 100,
+  severity   = "nm+",   
+  mu_beta    = pr_nm01$mu_beta,
+  sd_beta    = pr_nm01$sd_beta,
+  m_gamma    = pr_nm01$m_gamma,
+  sd_gamma   = pr_nm01$sd_gamma,
+  rho_beta   = c(1,1),
+  mu0 = 0, tau = 1
+)
+saveRDS(fitBLS_NM01, "Strongyloides_BLS_NM01.RDS")

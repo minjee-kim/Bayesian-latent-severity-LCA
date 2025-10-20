@@ -108,7 +108,7 @@ NM_LCA_severity <- function(
     3*logS - (s - mu0)^2/(2*tau^2) - 0.5*A*s^2 + B*s
   }
   
-  slice_logS <- function(logS0, Vij_row, beta, gamma, mu0, tau, w=1, m=50) {
+  slice_logS <- function(logS0, Vij_row, beta, gamma, mu0, tau, w=0.5, m=50) {
     y0 <- logpost_logS_i(logS0, Vij_row, beta, gamma, mu0, tau) - rexp(1)
     L <- logS0 - runif(1,0,w); R <- L + w
     JL <- sample.int(m,1)-1; KR <- (m-1)-JL

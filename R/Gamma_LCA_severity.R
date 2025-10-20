@@ -85,7 +85,7 @@ Gamma_LCA_severity <- function(data, iterations, burnin, thin = 1,
     B <- sum(beta * (Vij_row + gamma))
     aS*logS - bS*S - 0.5*A*S^2 + B*S
   }
-  slice_sample_logS <- function(logS0, Vij_row, beta, gamma, aS, bS, w=1.0, m=50) {
+  slice_sample_logS <- function(logS0, Vij_row, beta, gamma, aS, bS, w=0.5, m=50) {
     y0 <- logpost_logS_i(logS0, Vij_row, beta, gamma, aS, bS) - rexp(1)
     L <- logS0 - runif(1, 0, w); R <- L + w
     JL <- floor(runif(1, 0, m)); KR <- (m-1) - JL
@@ -116,8 +116,8 @@ Gamma_LCA_severity <- function(data, iterations, burnin, thin = 1,
       ll1   <- sum(Tij_row * log(p1) + (1 - Tij_row) * log1p(-p1))
       log_acc <- lpodds + (ll1 - ll0)
       if (is.finite(log_acc) && log(runif(1)) < log_acc) {
-        return(list(D = 1L, S = Sprop))
-      } else return(list(D = 0L, S = 0))
+        return(list(D = 1, S = Sprop))
+      } else return(list(D = 0, S = 0))
     } else {
       Scurr <- max(Si[i], .Machine$double.eps)
       eta1  <- beta * Scurr - gamma
@@ -126,12 +126,12 @@ Gamma_LCA_severity <- function(data, iterations, burnin, thin = 1,
       ll1   <- sum(Tij_row * log(p1) + (1 - Tij_row) * log1p(-p1))
       log_acc <- (-lpodds) + (ll0 - ll1)
       if (is.finite(log_acc) && log(runif(1)) < log_acc) {
-        return(list(D = 0L, S = 0))
-      } else return(list(D = 1L, S = Scurr))
+        return(list(D = 0, S = 0))
+      } else return(list(D = 1, S = Scurr))
     }
   }
   
-  keep_idx <- 0L
+  keep_idx <- 0
   for (iter in 1:iterations_tot) {
     
     for (i in 1:N) {
@@ -142,12 +142,12 @@ Gamma_LCA_severity <- function(data, iterations, burnin, thin = 1,
     
     V <- sample_Vij(Tij, Di, Si, beta, gamma)
     
-    for (i in which(Di==1L)) {
+    for (i in which(Di==1)) {
       logS0 <- log(Si[i])
       logS1 <- slice_sample_logS(logS0, V[i,], beta, gamma, aS, bS)
       Si[i] <- exp(logS1)
     }
-    Si[Di==0L] <- 0
+    Si[Di==0] <- 0
     
     beta  <- update_beta(V, Di, Si, gamma, mu_beta, sd_beta)
     gamma <- update_gamma(V, Di, Si, beta, m_gamma, sd_gamma)

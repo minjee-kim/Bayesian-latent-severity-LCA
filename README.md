@@ -4,50 +4,91 @@ Bayesian Latent Severity LCA
 A **Bayesian latent class model with continuous severity** for
 diagnostic test evaluation.
 
-This project extends classical Hui–Walter and random-effects LCA
-frameworks by introducing a continuous *latent severity* parameter
-$S_i$.  
-The approach enables efficient estimation of diagnostic accuracies and
-prevalence using **fewer than four assays**, addressing common
-identifiability limitations in small-panel diagnostic evaluations.
+This framework extends the classical Hui–Walter and random-effects
+latent class models by introducing a continuous *latent severity*
+parameter, $S_i$, representing the strength or intensity of infection
+among diseased individuals.  
+The approach enables reliable estimation of test accuracy and prevalence
+even with fewer than four diagnostic assays, overcoming traditional
+identifiability constraints in small-panel evaluations.
 
 ------------------------------------------------------------------------
 
 ## Overview
 
-Traditional latent class models assume conditional independence between
-binary tests given a latent disease status.  
-The **Latent Severity LCA (S-LCA)** relaxes this by allowing
-within-class variability in disease expression:
+Conventional latent class models assume *conditional independence*
+between binary tests given a latent disease indicator.  
+The **Latent Severity LCA (S-LCA)** relaxes this assumption by
+incorporating within-class variation in disease expression:
 
 $$
 T_{ij}^* = \beta_j S_i + \gamma_j + \varepsilon_{ij}, 
-\qquad T_{ij} = \mathbb{I}(T_{ij}^* > 0)
+\qquad T_{ij} = \mathbb{I}(T_{ij}^* > 0), \quad 
+\varepsilon_{ij} \sim \mathcal{N}(0, 1)
 $$
 
-Here, $S_i$ captures the strength or intensity of infection for diseased
-subjects ($D_i = 1$), producing more realistic inference on test
-sensitivity, specificity, and prevalence.
+Here, $S_i$ captures subject-level severity when $D_i = 1$, allowing
+tests to respond differently across mild and strong infections.  
+This yields more realistic inference on sensitivity, specificity, and
+prevalence, particularly when residual dependence exists among assays.
+
+## Latent Gaussian Representation
+
+The latent Gaussian formulation provides an intuitive view of how the
+detection threshold $\gamma_j$ separates test outcomes between healthy
+and diseased individuals:
+
+<p align="center">
+
+<img src="figures/V_plot.png" width="70%">
+</p>
 
 ------------------------------------------------------------------------
 
-### 1. `bayesian_severity_LCA()`
+## Function: `bayesian_severity_LCA()`
 
-A unified function implementing two prior choices for the latent
-severity parameter $S_i$:
+A unified function implementing **three model configurations** for the
+latent severity term $S_i$:
 
-- **Gamma Severity Model**  
-  $S_i \mid D_i = 1 \sim \mathrm{Gamma}(\alpha_S, \beta_S)$, 
-  $\beta_S \sim \mathrm{Gamma}(a_\beta, b_\beta)$
+### 1. Conditional Independence (CI) Model
 
-- **Normal Moment (NM⁺) Severity Model**  
-  $p(S_i \mid D_i = 1) \propto S_i^2 \exp[-(S_i - \mu_0)^2 / (2\tau^2)]$, 
-  $S_i > 0$,  $\tau^2 \sim \mathrm{Inv\text{-}Gamma}(a_\tau, b_\tau)$
+A baseline model assuming no within-class variation in disease
+severity:  
+$$
+S_i = D_i \quad \text{(binary latent disease indicator only)}
+$$ This reduces to the classical Hui–Walter framework, serving as a
+reference model for conditional independence diagnostics.
 
-Both models employ MCMC with truncated-normal data augmentation for
-latent test variables, and include posterior updates for: - Class
-indicator $D_i$ - Test parameters $(\beta_j, \gamma_j, \sigma_j^2)$ -
-Prevalence $\rho$ - Severity priors (Gamma or NM+)
+### 2. Gamma Severity Model
+
+$$
+S_i \mid D_i = 1 \sim \mathrm{Gamma}(\alpha_S, \beta_S)
+$$ Provides a flexible, right-skewed representation of disease
+severity.  
+The shape parameters $(\alpha_S, \beta_S)$ can be tuned to reflect
+expected heterogeneity or residual dependence between assays.
+
+### 3. Normal Moment (NM⁺) Severity Model
+
+$$
+p(S_i \mid D_i = 1) \propto S_i^2 
+\exp\!\left[-\frac{(S_i - \mu_0)^2}{2\tau^2}\right],
+\quad S_i > 0
+$$ A nonlocal prior that discourages near-zero severity, promoting
+sharper separation between healthy and diseased classes.  
+Defaults $(\mu_0, \tau) = (0, 1.48495)$ yield unit variance for $S_i$.
+
+------------------------------------------------------------------------
+
+## Posterior Components
+
+All models employ MCMC with truncated-normal data augmentation for the
+latent diagnostic variables, including updates for:
+
+- Class indicators $D_i$  
+- Test parameters $(\beta_j, \gamma_j, \sigma_j^2)$  
+- Prevalence $\rho$  
+- Severity priors (CI, Gamma, or NM⁺)
 
 ------------------------------------------------------------------------
 
@@ -56,4 +97,30 @@ Prevalence $\rho$ - Severity priors (Gamma or NM+)
 The following figure compares the Gamma and NM+ priors for $S_i$ when
 each has variance = 1:
 
-![](README_files/unnamed-chunk-1-1.png)<!-- -->
+<p align="center">
+
+<img src="figures/S_plot.png" width="65%">
+</p>
+
+------------------------------------------------------------------------
+
+### Case Study: Strongyloides Data (Dendukuri & Joseph, 2001)
+
+We replicate and extend the Strongyloides stercoralis dataset analyzed
+by (Dendukuri, Joseph 1995), originally consisting of three binary
+assays applied to a refugee population. The CI model serves as a
+baseline, while the Gamma and NM⁺ severity models reveal residual
+dependence between tests that cannot be explained by conditional
+independence alone.
+
+The posterior summaries below illustrate how the latent severity
+formulation provides improved fit and interpretable differences in
+estimated sensitivity and prevalence across models.
+
+------------------------------------------------------------------------
+
+### Conditional Independence Diagnostics
+
+To formally evaluate whether test outcomes are independent given disease
+status, we construct a Bayesian chi-square diagnostic, computed from
+posterior predictive samples of the latent class model.

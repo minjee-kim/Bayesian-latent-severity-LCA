@@ -67,6 +67,25 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     return(likelihood_mat)
   }
   
+  
+  gamma_update <- function(Vij, Di, m_gamma, sd_gamma) {
+    N <- length(Di)
+    J <- ncol(Vij)
+    x  <- Di
+    x2 <- sum(x^2) 
+    out <- numeric(J)
+    for (j in 1:J) {
+      vtil  <- Vij[, j] + gamma_j[j]  
+      s1    <- sum(x * vtil)
+      prec0 <- 1/(sd_beta[j]^2)
+      prec  <- prec0 + x2
+      meanj <- (prec0 * mu_beta[j] + s1)/prec
+      gamma_j[j] <- rtruncnorm(1, a = 0, b = Inf, mean = meanj, sd = 1/sqrt(prec))
+    }
+    gamma_j
+  }
+  
+  
   D_update <- function(rho, Tij, beta_j, gamma_j) {
     N <- nrow(Tij)
     D_new <- rep(0, N)
@@ -124,55 +143,6 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     beta_new
   }
   
-  
-  gamma_update <- function(Tij, Di, beta_j, gamma_j, Vij, proposal_sd = 0.1,
-                           m_gamma, sd_gamma) {
-    N <- nrow(Tij); T_col <- ncol(Tij)
-    for (j in 1:T_col) {
-      gamma_curr <- gamma_j[j]
-      
-      # bounds from truncated-normal augmentation
-      Vj <- Vij[, j]
-      V0 <- Vj[Tij[, j] == 0]
-      V1 <- Vj[Tij[, j] == 1]
-      if (length(V0) == 0L || length(V1) == 0L) next
-      
-      a <- max(V0) - 0.05; b <- min(V1) + 0.05
-      if (a >= b) next
-      
-      gamma_prop <- rtruncnorm(1, a = a, b = b, mean = gamma_curr, sd = proposal_sd)
-      
-      mu_ij  <- beta_j[j] * Di
-      z_curr <- gamma_curr - mu_ij
-      z_prop <- gamma_prop - mu_ij
-      
-      loglik_curr <- sum(ifelse(Tij[, j] == 1, log1p(-pnorm(z_curr)),
-                                log(pmax(pnorm(z_curr), 1e-12))))
-      loglik_prop <- sum(ifelse(Tij[, j] == 1, log1p(-pnorm(z_prop)),
-                                log(pmax(pnorm(z_prop), 1e-12))))
-      
-      # per-test hyperparameters (support scalar or vector inputs)
-      m_gj  <- if (length(m_gamma)  > 1) m_gamma[j]  else m_gamma
-      sd_gj <- if (length(sd_gamma) > 1) sd_gamma[j] else sd_gamma
-      
-      log_prior_curr <- dnorm(gamma_curr, mean = m_gj,  sd = sd_gj, log = TRUE)
-      log_prior_prop <- dnorm(gamma_prop, mean = m_gj,  sd = sd_gj, log = TRUE)
-      
-      log_q_curr_to_prop <- log(dtruncnorm(gamma_prop, a = a, b = b, mean = gamma_curr, sd = proposal_sd) + 1e-12)
-      log_q_prop_to_curr <- log(dtruncnorm(gamma_curr, a = a, b = b, mean = gamma_prop, sd = proposal_sd) + 1e-12)
-      
-      log_alpha <- (loglik_prop + log_prior_prop + log_q_prop_to_curr) -
-        (loglik_curr + log_prior_curr + log_q_curr_to_prop)
-      
-      # both comparisons are scalars now
-      if (is.finite(log_alpha) && (log(runif(1)) < log_alpha) && (gamma_prop <= 5)) {
-        gamma_j[j] <- gamma_prop
-      }
-    }
-    gamma_j
-  }
-  
-  
   ### MCMC 
   for(iter in 1:iterations_tot){
     
@@ -183,11 +153,10 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     Vij <- sample_Vij(Tij, Di, beta_j, gamma_j)
     
     ## gamma_j update 
-    gamma_j <- gamma_update(Tij, Di, beta_j, gamma_j, Vij, proposal_sd = 0.01,
-                            m_gamma = m_gamma, sd_gamma = sd_gamma)
+    gamma_j <- gamma_update(Vij, Di, m_gamma, sd_gamma)
     
     ## beta_j update
-    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.01, mu_beta = mu_beta, sd_beta = sd_beta)    
+    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.05, mu_beta = mu_beta, sd_beta = sd_beta)    
     
     ## rho update
     rho = rbeta(1, 1 + sum(Di), 1 + (N - sum(Di)))

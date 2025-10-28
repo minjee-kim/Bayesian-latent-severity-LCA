@@ -1,24 +1,22 @@
 
 
 source("Gamma_LCA_severity.R")
-source("NM_LCA_severity.R")
 source("CI_LCA_probit.R")
 source("build_priors_from_ranges.R")
 
 Bayesian_LCA_severity <- function(
     data, iterations, burnin, thin = 1,
-    severity = c("CI", "gamma", "nm+"),
+    severity = c("CI", "gamma"),
     # per-test priors (required): vectors of length J
     mu_beta,  sd_beta,    # beta_j ~ N+(mu_beta[j], sd_beta[j]^2) (truncated at 0)
     m_gamma,  sd_gamma,   # gamma_j ~ N(m_gamma[j], sd_gamma[j]^2)
     # prevalence prior
-    rho_beta = c(1, 1),   # ρ ~ Beta(a,b)
+    rho_beta = c(1, 1),   # rho ~ Beta(a,b)
     # severity hyper (only if not "CI")
-    aS = 3, bS = sqrt(3), # for gamma S|D=1
-    mu0 = 0, tau = 1.48495 # for NM+ S|D=1
+    aS = 3, bS = sqrt(3) # for gamma S|D=1
 ){
   library(truncnorm)
-  severity <- match.arg(tolower(severity), c("ci","gamma","nm+"))
+  severity <- match.arg(tolower(severity), c("ci","gamma"))
   data = as.matrix(data)
   if (!all(data %in% c(0,1))) stop("data must be 0/1.")
   
@@ -54,24 +52,12 @@ Bayesian_LCA_severity <- function(
                                              m_gamma    = m_gamma,
                                              sd_gamma   = sd_gamma,
                                              a_rho      = a_rho,
-                                             b_rho      = b_rho),
-                "nm+" = NM_LCA_severity(data       = data,
-                                        iterations = iterations,
-                                        burnin     = burnin,
-                                        thin       = thin,
-                                        mu0        = mu0,
-                                        tau        = tau,
-                                        mu_beta    = mu_beta,
-                                        sd_beta    = sd_beta,
-                                        m_gamma    = m_gamma,
-                                        sd_gamma   = sd_gamma,
-                                        a_rho      = a_rho,
-                                        b_rho      = b_rho)
+                                             b_rho      = b_rho)
   )
   
   priors <- list(
     severity = tolower(severity),
-    aS = aS, bS = bS, mu0 = mu0, tau = tau,
+    aS = aS, bS = bS,
     rho_ab = c(a = rho_beta[1], b = rho_beta[2]),
     per_test = Map(function(mb, sdb, mg, sdg)
       list(m_beta = mb, sd_beta = sdb, m_gamma = mg, sd_gamma = sdg),

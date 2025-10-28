@@ -107,8 +107,7 @@ Bayesian_LCA_severity <- function(
       aS = aS, bS = bS,
       rho_ab = c(a = a_rho, b = b_rho),
       per_test = Map(function(sh, rt, mg, sdg)
-        list(beta_prior = "Gamma(rate)",
-             aB = sh, bB = rt,
+        list(aB = sh, bB = rt,
              mu_gamma = mg, sd_gamma = sdg),
         aB, bB, mu_gamma, sd_gamma)
     )

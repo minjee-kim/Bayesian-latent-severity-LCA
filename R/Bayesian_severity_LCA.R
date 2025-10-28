@@ -11,11 +11,9 @@ Bayesian_LCA_severity <- function(
     mu_gamma = NULL, sd_gamma = NULL,  # gamma_j ~ N(mu_gamma[j], sd_gamma[j]^2)
     # gamma
     aB = NULL, bB = NULL, # beta_j ~ Gamma(aB[j], bB[j])  (rate)
-    mu_gamma = NULL, # gamma_j ~ N(mu_gamma[j], sd_gamma[j]^2)
+    aS = 3, bS = sqrt(3), # S|D=1 ~ Gamma(aS,bS)
     # prevalence prior
-    rho_beta = c(1, 1), # rho ~ Beta(a,b)
-    # if severity == "gamma"
-    aS = 3, bS = sqrt(3) # S|D=1 ~ Gamma(aS,bS)
+    rho_beta = c(1, 1)
 ){
   severity <- match.arg(tolower(severity), c("ci","gamma"))
   data <- as.matrix(data)

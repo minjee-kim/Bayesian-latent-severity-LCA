@@ -23,6 +23,7 @@ data <- do.call(rbind, strsplit(expanded, ""))
 data <- as.data.frame(apply(data, 2, as.numeric))
 table(data)
 
+source("~/Desktop/Bayesian-latent-severity-LCA/R/init.R")
 
 ##################################################################################
 ######### Reproducing the results on Joseph, Dendukuri 2001 page 159 #############
@@ -35,7 +36,7 @@ prior_CI = list(
   )
 )
 fit_CI <- bayes_2LCR(data = data, model="CI",
-                        iterations = 200000, burnin=50000, thin=1,
+                        iterations = 200000, burnin=100000, thin=10,
                         prior_input=prior_CI)
 # saveRDS(fit_CI, "Strongyloides_CI.RDS")
 
@@ -57,7 +58,7 @@ prior_rand <- list(
 
 fit_rand <- bayes_2LCR(data = data, model="2LCR1", 
                        common_slopes = FALSE,
-                       iterations = 200000, burnin=50000, thin=1,
+                       iterations = 200000, burnin=100000, thin=10,
                        prior_input=prior_rand)
 
 # saveRDS(fit_rand, "Strongyloides_random.RDS")
@@ -77,7 +78,7 @@ fitBLS_CI <- Bayesian_LCA_severity(
   data       = data,
   iterations = 200000,
   burnin     = 100000,
-  thin       = 100,
+  thin       = 10,
   severity   = "CI",   
   mu_beta    = pr_CI$mu_beta,
   sd_beta    = pr_CI$sd_beta,
@@ -92,7 +93,7 @@ fitBLS_Gamma <- Bayesian_LCA_severity(
   data       = data,
   iterations = 200000,
   burnin     = 100000,
-  thin       = 100,
+  thin       = 10,
   severity   = "gamma",   
   mu_beta    = pr_gamma$mu_beta,
   sd_beta    = pr_gamma$sd_beta,

@@ -3,10 +3,12 @@
 
 build_priors_from_ranges <- function(
     ranges,
-    severity_prior = list(type = "gamma", aS = 3, bS = sqrt(3)), 
-    ci_level = 0.95,
-    clamp_sd = 1.5
+    severity = list(type = "gamma")
 ){
+  aS = 3
+  bS = sqrt(3)
+  ci_level = 0.95
+  clamp_sd = 1.5
   Sm  <- S_moments(severity_prior)
   muS <- Sm$mean
   vS  <- Sm$var

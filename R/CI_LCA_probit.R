@@ -2,7 +2,7 @@
 
 CI_LCA_probit <- function(data, iterations, burnin, thin=1,
                           mu_beta, sd_beta,  # beta_j: probit Se_j
-                          m_gamma, sd_gamma, # gamma_j: probit Sp_j
+                          mu_gamma, sd_gamma, # gamma_j: probit Sp_j
                           a_rho=1, b_rho=1){
   library(truncnorm)
   Tij = as.matrix(data)
@@ -10,7 +10,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
   T_col = ncol(Tij)
   rho = runif(1) 
   Di = rbinom(N, 1, rho)
-  gamma_j = rnorm(T_col, m_gamma, sd_gamma)
+  gamma_j = rnorm(T_col, mu_gamma, sd_gamma)
   beta_j = rtruncnorm(T_col, a = 0, b = Inf, mean = mu_beta, sd = sd_beta)
   
   ## initializing samples
@@ -68,7 +68,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
   }
   
   
-  gamma_update <- function(Vij, Di, m_gamma, sd_gamma, beta_j) {
+  gamma_update <- function(Vij, Di, mu_gamma, sd_gamma, beta_j) {
     N <- length(Di)
     J <- ncol(Vij)
     out <- numeric(J)
@@ -76,7 +76,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
       Zj <- Vij[, j] - gamma_j[j]
       y  <- Zj - beta_j[j] * Di   
       s2_post <- 1 / (N + 1/(sd_gamma[j]^2))
-      m_post  <- s2_post * (-sum(y) + m_gamma[j]/(sd_gamma[j]^2))
+      m_post  <- s2_post * (-sum(y) + mu_gamma[j]/(sd_gamma[j]^2))
       out[j]  <- rnorm(1, m_post, sqrt(s2_post))
     }
     out
@@ -151,7 +151,7 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     Vij <- sample_Vij(Tij, Di, beta_j, gamma_j)
     
     ## gamma_j update 
-    gamma_j <- gamma_update(Vij, Di, m_gamma, sd_gamma, beta_j)
+    gamma_j <- gamma_update(Vij, Di, mu_gamma, sd_gamma, beta_j)
     
     
     ## beta_j update

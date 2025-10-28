@@ -1,92 +1,100 @@
 
 
-source("Gamma_LCA_severity.R")
-source("CI_LCA_probit.R")
-source("build_priors_from_ranges.R")
 
-Bayesian_LCA_severity <- function(
-    data, iterations, burnin, thin = 1,
-    severity = c("CI", "gamma"),
-    # per-test priors (required): vectors of length J (or scalars to recycle)
-    mu_beta,  sd_beta,    # beta_j ~ N+(mu_beta[j], sd_beta[j]^2) (truncated at 0)
-    m_gamma,  sd_gamma,   # gamma_j ~ N(m_gamma[j], sd_gamma[j]^2)
-    # prevalence prior
-    rho_beta = c(1, 1),   # rho ~ Beta(a,b)
-    # severity hyper (only if not "CI")
-    aS = 3, bS = sqrt(3)  # for gamma S|D=1
+build_priors_from_ranges <- function(
+    ranges,
+    severity_prior = list(type = "gamma", aS = 3, bS = sqrt(3)), 
+    ci_level = 0.95,
+    clamp_sd = 1.5
 ){
-  severity <- match.arg(tolower(severity), c("ci","gamma"))
+  Sm  <- S_moments(severity_prior)
+  muS <- Sm$mean
+  vS  <- Sm$var
+  z   <- qnorm((1 + ci_level) / 2)
   
-  # data checks
-  data <- as.matrix(data)
-  if (!all(data %in% c(0,1))) stop("data must be 0/1.")
-  if (!is.numeric(iterations) || !is.numeric(burnin) || !is.numeric(thin)) stop("iterations/burnin/thin must be numeric.")
-  if (iterations <= burnin) stop("iterations must be > burnin.")
-  if (thin < 1) stop("thin must be >= 1.")
-  if (iterations != as.integer(iterations) || burnin != as.integer(burnin) || thin != as.integer(thin))
-    warning("iterations/burnin/thin will be coerced to integers by subroutines.")
-  
-  J <- ncol(data)
-  
-  # accept scalars or length-J vectors; recycle if needed
-  as_lenJ <- function(x, nm){
-    if (length(x) == 1) rep(x, J)
-    else if (length(x) == J) x
-    else stop(sprintf("%s must be length 1 or %d", nm, J))
+  # Solve β from target p = Φ( (β μS − mγ) / sqrt(1 + β^2 vS) )
+  solve_beta_from_Se <- function(p, m_gamma, muS, vS){
+    p <- min(max(p, 1e-9), 1 - 1e-9)
+    t <- qnorm(p)
+    A <- muS^2 - (t^2) * vS
+    B <- -2 * muS * m_gamma
+    C <- m_gamma^2 - t^2
+    if (abs(A) < 1e-10) {
+      beta <- -C / B
+      return(max(beta, 1e-9))
+    } else {
+      disc <- B*B - 4*A*C
+      disc <- max(disc, 0) 
+      b1 <- (-B + sqrt(disc)) / (2*A)
+      b2 <- (-B - sqrt(disc)) / (2*A)
+      cand <- c(b1, b2)
+      cand <- cand[is.finite(cand) & cand > 0]
+      if (length(cand) == 0) {
+        return(1e-6)
+      } else {
+        best <- cand[1]
+        best_err <- abs(p - pnorm((best*muS - m_gamma)/sqrt(1 + best*best*vS)))
+        for (bb in cand[-1]) {
+          err <- abs(p - pnorm((bb*muS - m_gamma)/sqrt(1 + bb*bb*vS)))
+          if (err < best_err) { best <- bb; best_err <- err }
+        }
+        return(best)
+      }
+    }
   }
-  mu_beta  <- as_lenJ(mu_beta,  "mu_beta")
-  sd_beta  <- as_lenJ(sd_beta,  "sd_beta")
-  m_gamma  <- as_lenJ(m_gamma,  "m_gamma")
-  sd_gamma <- as_lenJ(sd_gamma, "sd_gamma")
   
-  # prevalence prior
-  a_rho <- rho_beta[1]; b_rho <- rho_beta[2]
-  if (any(!is.finite(c(a_rho, b_rho))) || any(c(a_rho, b_rho) <= 0))
-    stop("rho_beta must be positive and finite (Beta shape params).")
+  map_spec_to_gamma <- function(Lsp, Usp, z, clamp_sd){
+    Lsp <- min(max(Lsp, 1e-6), 1 - 1e-6)
+    Usp <- min(max(Usp, 1e-6), 1 - 1e-6)
+    zL  <- qnorm(Lsp); zU <- qnorm(Usp)
+    m_gamma  <- 0.5 * (zL + zU)
+    sd_gamma <- (zU - zL) / (2 * z)
+    sd_gamma <- min(max(sd_gamma, 0.05), clamp_sd)
+    c(m_gamma = m_gamma, sd_gamma = sd_gamma)
+  }
   
-  fit <- switch(
-    severity,
-    "ci" = CI_LCA_probit(
-      data       = data,
-      iterations = iterations,
-      burnin     = burnin,
-      thin       = thin,
-      mu_beta    = mu_beta,
-      sd_beta    = sd_beta,
-      m_gamma    = m_gamma,
-      sd_gamma   = sd_gamma,
-      a_rho      = a_rho,
-      b_rho      = b_rho
-    ),
-    "gamma" = Gamma_LCA_severity(
-      data       = data,
-      iterations = iterations,
-      burnin     = burnin,
-      thin       = thin,
-      aS         = aS,
-      bS         = bS,
-      mu_beta    = mu_beta,
-      sd_beta    = sd_beta,
-      m_gamma    = m_gamma,
-      sd_gamma   = sd_gamma,
-      a_rho      = a_rho,
-      b_rho      = b_rho
-    )
-  )
+  out <- lapply(ranges, function(rg){
+    Lsp <- min(rg$spec); Usp <- max(rg$spec)
+    gg  <- map_spec_to_gamma(Lsp, Usp, z, clamp_sd)
+    m_gamma <- gg["m_gamma"]; sd_gamma <- gg["sd_gamma"]
+    
+    Lse <- min(rg$sens); Use <- max(rg$sens)
+    Lse <- min(max(Lse, 1e-6), 1 - 1e-6)
+    Use <- min(max(Use, 1e-6), 1 - 1e-6)
+    mse <- 0.5 * (Lse + Use)
+    
+    m_beta <- solve_beta_from_Se(mse, m_gamma, muS, vS)
+    
+    bL <- solve_beta_from_Se(Lse, m_gamma, muS, vS)
+    bU <- solve_beta_from_Se(Use, m_gamma, muS, vS)
+    sd_beta <- (bU - bL) / (2 * z)
+    sd_beta <- max(sd_beta, 0.05)
+    
+    if (tolower(severity_prior$type) == "ci") {
+      list(
+        m_gamma = as.numeric(m_gamma),
+        sd_gamma = as.numeric(sd_gamma),
+        m_beta  = as.numeric(m_beta),
+        sd_beta = as.numeric(sd_beta),
+        beta_prior = "TN+"
+      )
+    } else {
+      aB <- (m_beta / sd_beta)^2
+      bB <-  m_beta / (sd_beta^2)
+      aB <- max(aB, 1e-6)
+      bB <- max(bB, 1e-6)
+      list(
+        m_gamma = as.numeric(m_gamma),
+        sd_gamma = as.numeric(sd_gamma),
+        aB = as.numeric(aB),
+        bB = as.numeric(bB),
+        beta_prior = "Gamma(rate)"
+      )
+    }
+  })
   
-  # attach priors to fit object
-  priors <- list(
-    severity = severity,
-    aS = aS, bS = bS,
-    rho_ab = c(a = a_rho, b = b_rho),
-    per_test = Map(function(mb, sdb, mg, sdg)
-      list(m_beta = mb, sd_beta = sdb, m_gamma = mg, sd_gamma = sdg),
-      mu_beta, sd_beta, m_gamma, sd_gamma)
-  )
-  fit$priors <- priors
-  fit
+  out
 }
-
 
 
 

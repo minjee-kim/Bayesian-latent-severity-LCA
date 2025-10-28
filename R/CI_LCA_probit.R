@@ -4,14 +4,14 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
                           mu_beta, sd_beta,  # beta_j: probit Se_j
                           m_gamma, sd_gamma, # gamma_j: probit Sp_j
                           a_rho=1, b_rho=1){
-  
+  library(truncnorm)
   Tij = as.matrix(data)
   N = nrow(Tij)
   T_col = ncol(Tij)
   rho = runif(1) 
   Di = rbinom(N, 1, rho)
   gamma_j = rnorm(T_col, m_gamma, sd_gamma)
-  beta_j = rtruncnorm(T_col, a = 0, b = Inf, mean = 0, sd = 1) # beta_j ~ norm(0, 2^2)
+  beta_j = rtruncnorm(T_col, a = 0, b = Inf, mean = mu_beta, sd = sd_beta)
   
   ## initializing samples
   iterations_tot = iterations + burnin
@@ -68,22 +68,20 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
   }
   
   
-  gamma_update <- function(Vij, Di, m_gamma, sd_gamma) {
+  gamma_update <- function(Vij, Di, m_gamma, sd_gamma, beta_j) {
     N <- length(Di)
     J <- ncol(Vij)
-    x  <- Di
-    x2 <- sum(x^2) 
     out <- numeric(J)
     for (j in 1:J) {
-      vtil  <- Vij[, j] + gamma_j[j]  
-      s1    <- sum(x * vtil)
-      prec0 <- 1/(sd_beta[j]^2)
-      prec  <- prec0 + x2
-      meanj <- (prec0 * mu_beta[j] + s1)/prec
-      gamma_j[j] <- rtruncnorm(1, a = 0, b = Inf, mean = meanj, sd = 1/sqrt(prec))
+      Zj <- Vij[, j] - gamma_j[j]
+      y  <- Zj - beta_j[j] * Di   
+      s2_post <- 1 / (N + 1/(sd_gamma[j]^2))
+      m_post  <- s2_post * (-sum(y) + m_gamma[j]/(sd_gamma[j]^2))
+      out[j]  <- rnorm(1, m_post, sqrt(s2_post))
     }
-    gamma_j
+    out
   }
+  
   
   
   D_update <- function(rho, Tij, beta_j, gamma_j) {
@@ -153,13 +151,14 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     Vij <- sample_Vij(Tij, Di, beta_j, gamma_j)
     
     ## gamma_j update 
-    gamma_j <- gamma_update(Vij, Di, m_gamma, sd_gamma)
+    gamma_j <- gamma_update(Vij, Di, m_gamma, sd_gamma, beta_j)
+    
     
     ## beta_j update
     beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.05, mu_beta = mu_beta, sd_beta = sd_beta)    
     
     ## rho update
-    rho = rbeta(1, 1 + sum(Di), 1 + (N - sum(Di)))
+    rho <- rbeta(1, a_rho + sum(Di), b_rho + (N - sum(Di)))
     
     if(iter > burnin && ((iter - burnin) %% thin == 0)){
       index <- (iter - burnin) / thin
@@ -167,9 +166,8 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
       D_samples[index, ] <- Di
       gamma_samples[index, ] <- gamma_j
       beta_samples[index, ] <- beta_j
-      
-      sens = sapply(1:T_col, function(j) mean(1 - pnorm(gamma_j[j], mean = beta_j[j] * Di[Di == 1])) )
-      spec = pnorm(gamma_j)
+      sens <- pnorm(beta_j - gamma_j) 
+      spec <- pnorm(gamma_j)
       
       sensitivity_samples[index, ] <- sens
       specificity_samples[index, ] <- spec

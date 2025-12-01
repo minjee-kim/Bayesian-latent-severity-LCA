@@ -68,16 +68,21 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
   }
   
   
-  gamma_update <- function(Vij, Di, mu_gamma, sd_gamma, beta_j) {
-    N <- length(Di)
+  gamma_update <- function(Vij, Tij, mu_gamma, sd_gamma) {
     J <- ncol(Vij)
     out <- numeric(J)
     for (j in 1:J) {
-      Zj <- Vij[, j] - gamma_j[j]
-      y  <- Zj - beta_j[j] * Di   
-      s2_post <- 1 / (N + 1/(sd_gamma[j]^2))
-      m_post  <- s2_post * (-sum(y) + mu_gamma[j]/(sd_gamma[j]^2))
-      out[j]  <- rnorm(1, m_post, sqrt(s2_post))
+      a <- if (any(Tij[, j] == 0L)) max(Vij[Tij[, j] == 0L, j]) else -Inf
+      b <- if (any(Tij[, j] == 1L)) min(Vij[Tij[, j] == 1L, j]) else  Inf
+      
+      # If bounds cross due to numerical ties, widen slightly:
+      if (a >= b) {
+        eps <- 1e-8
+        a <- a - eps
+        b <- b + eps
+      }
+      out[j] <- truncnorm::rtruncnorm(1, a = a, b = b,
+                                      mean = mu_gamma[j], sd = sd_gamma[j])
     }
     out
   }
@@ -151,11 +156,10 @@ CI_LCA_probit <- function(data, iterations, burnin, thin=1,
     Vij <- sample_Vij(Tij, Di, beta_j, gamma_j)
     
     ## gamma_j update 
-    gamma_j <- gamma_update(Vij, Di, mu_gamma, sd_gamma, beta_j)
-    
+    gamma_j <- gamma_update(Vij, Tij, mu_gamma, sd_gamma)
     
     ## beta_j update
-    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.05, mu_beta = mu_beta, sd_beta = sd_beta)    
+    beta_j <- beta_mh(Di, beta_j, Vij, proposal_sd = 0.1, mu_beta = mu_beta, sd_beta = sd_beta)    
     
     ## rho update
     rho <- rbeta(1, a_rho + sum(Di), b_rho + (N - sum(Di)))

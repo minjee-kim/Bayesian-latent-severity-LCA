@@ -23,7 +23,7 @@ data <- do.call(rbind, strsplit(expanded, ""))
 data <- as.data.frame(apply(data, 2, as.numeric))
 table(data)
 
-source("~/Desktop/Bayesian-latent-severity-LCA/R/init.R")
+source("~/Desktop/Bayesian-latent-severity-LCA/R/init.R", chdir = TRUE)
 
 ##################################################################################
 ######### Reproducing the results on Joseph, Dendukuri 2001 page 159 #############
@@ -31,14 +31,14 @@ source("~/Desktop/Bayesian-latent-severity-LCA/R/init.R")
 prior_CI = list(
   prev = c(1,1),  # Beta(1,1) on prevalence
   tests = list(
-    list(sens=c(4.44, 13.31), spec=c(71.25, 3.75)),  # Test 1
-    list(sens=c(21.96, 5.49), spec=c(4.1, 1.76))   # Test 2
+    list(sens=c(4.44, 13.31), spec=c(71.25, 3.75)), 
+    list(sens=c(21.96, 5.49), spec=c(4.1, 1.76)) 
   )
 )
 fit_CI <- bayes_2LCR(data = data, model="CI",
-                        iterations = 200000, burnin=100000, thin=10,
+                        iterations = 500000, burnin=200000, thin=10,
                         prior_input=prior_CI)
-# saveRDS(fit_CI, "Strongyloides_CI.RDS")
+saveRDS(fit_CI, "Strongyloides_CI.RDS")
 
 prior_rand <- list(
   prev = c(1,1),   # Beta(a,b) for prevalence
@@ -58,10 +58,10 @@ prior_rand <- list(
 
 fit_rand <- bayes_2LCR(data = data, model="2LCR1", 
                        common_slopes = FALSE,
-                       iterations = 200000, burnin=100000, thin=10,
+                       iterations = 500000, burnin=200000, thin=10,
                        prior_input=prior_rand)
 
-# saveRDS(fit_rand, "Strongyloides_random.RDS")
+saveRDS(fit_rand, "Strongyloides_random.RDS")
 
 
 
@@ -69,41 +69,75 @@ fit_rand <- bayes_2LCR(data = data, model="2LCR1",
 ######### Running our model on the same data #####################################
 ##################################################################################
 ranges <- list(
-  list(sens=c(0.07, 0.47), spec=c(0.89, 0.99)),   # test 1
-  list(sens=c(0.63, 0.92), spec=c(0.31, 0.96))   # test 2
+  list(sens=c(0.07, 0.47), spec=c(0.89, 0.99)),
+  list(sens=c(0.63, 0.92), spec=c(0.31, 0.96))
 )
 
 pr_CI <- build_priors_from_ranges(ranges, severity="CI")
 fitBLS_CI <- Bayesian_LCA_severity(
   data       = data,
-  iterations = 200000,
-  burnin     = 100000,
+  iterations = 500000,
+  burnin     = 200000,
   thin       = 10,
   severity   = "CI",   
   mu_beta    = pr_CI$mu_beta,
   sd_beta    = pr_CI$sd_beta,
-  m_gamma    = pr_CI$m_gamma,
+  mu_gamma    = pr_CI$mu_gamma,
   sd_gamma   = pr_CI$sd_gamma,
   rho_beta   = c(1,1)
 )
 saveRDS(fitBLS_CI, "Strongyloides_BLS_CI.RDS")
 
-pr_gamma <- build_priors_from_ranges(ranges, severity="gamma", aS=3, bS=sqrt(3))
+
+pr_gamma <- build_priors_from_ranges(ranges, severity="gamma", aS = 4.5, bS = sqrt(4.5))
 fitBLS_Gamma <- Bayesian_LCA_severity(
   data       = data,
-  iterations = 200000,
-  burnin     = 100000,
+  iterations = 500000,
+  burnin     = 200000,
   thin       = 10,
   severity   = "gamma",   
-  mu_beta    = pr_gamma$mu_beta,
-  sd_beta    = pr_gamma$sd_beta,
-  m_gamma    = pr_gamma$m_gamma,
+  mu_gamma    = pr_gamma$mu_gamma,
   sd_gamma   = pr_gamma$sd_gamma,
+  mu_beta = pr_gamma$mu_beta, 
+  sd_beta = pr_gamma$sd_beta,
+  aS = 4.5, bS = sqrt(4.5),
   rho_beta   = c(1,1)
 )
-saveRDS(fitBLS_Gamma, "Strongyloides_BLS_Gamma3.RDS")
+saveRDS(fitBLS_Gamma, "Strongyloides_BLS_Gamma.RDS")
 
 
 
+
+
+################# Dendukuri & Joseph Bayesian RE ############
+quantile(fit_RE_CI$rho, c(0.5, 0.025, 0.975))
+quantile(fit_RE_CI$sens[,1], c(0.5, 0.025, 0.975))
+quantile(fit_RE_CI$spec[,1], c(0.5, 0.025, 0.975))
+quantile(fit_RE_CI$sens[,2], c(0.5, 0.025, 0.975))
+quantile(fit_RE_CI$spec[,2], c(0.5, 0.025, 0.975))
+
+quantile(fit_RE_RAND$rho, c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$sens[,1], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$spec[,1], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$sens[,2], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$spec[,2], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$a1[,1], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$a1[,2], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$a0[,1], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$a0[,2], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$b0[,1], c(0.5, 0.025, 0.975))
+quantile(fit_RE_RAND$b1[,1], c(0.5, 0.025, 0.975))
+
+################# Our Model ##################################
+quantile(fit_BLS_CI$rho_Samples, c(0.5, 0.025, 0.975))
+quantile(fit_BLS_CI$sensitivity_Samples[,1], c(0.5, 0.025, 0.975))
+quantile(fit_BLS_CI$specificity_Samples[,1], c(0.5, 0.025, 0.975))
+quantile(fit_BLS_CI$sensitivity_Samples[,2], c(0.5, 0.025, 0.975))
+quantile(fit_BLS_CI$specificity_Samples[,2], c(0.5, 0.025, 0.975))
+quantile(fitBLS_Gamma$rho_Samples, c(0.5, 0.025, 0.975))
+quantile(fitBLS_Gamma$sensitivity_Samples[,1], c(0.5, 0.025, 0.975))
+quantile(fitBLS_Gamma$specificity_Samples[,1], c(0.5, 0.025, 0.975))
+quantile(fitBLS_Gamma$sensitivity_Samples[,2], c(0.5, 0.025, 0.975))
+quantile(fitBLS_Gamma$specificity_Samples[,2], c(0.5, 0.025, 0.975))
 
 

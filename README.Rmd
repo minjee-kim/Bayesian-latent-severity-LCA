@@ -12,109 +12,157 @@ knitr::opts_chunk$set(
 )
 ```
 
+Bayesian latent class models for binary diagnostic tests when no gold standard is available. The severity model adds one continuous subject-level factor among diseased individuals, so two imperfect assays can still inform prevalence, sensitivity, and specificity without a test-specific random effect for every class.
 
-A **Bayesian latent class model with continuous severity** for diagnostic test evaluation.
+This repository accompanies the manuscript *Bayesian Latent Severity Modeling for Diagnostic Test Evaluation Without a Gold Standard*. It is a set of R scripts, not a package. Source `R/init.R` from the `R/` directory.
 
-This framework extends the classical Hui–Walter and random-effects latent class models by introducing a continuous *latent severity* parameter, \( S_i \), representing the strength or intensity of infection among diseased individuals.  
-The approach enables reliable estimation of test accuracy and prevalence even with fewer than four diagnostic assays, overcoming traditional identifiability constraints in small-panel evaluations.
+## Model
 
----
-
-## Overview
-
-Conventional latent class models assume *conditional independence* between binary tests given a latent disease indicator.  
-The **Latent Severity LCA (S-LCA)** relaxes this assumption by incorporating within-class variation in disease expression:
+For subject \(i\) and test \(j\), the binary outcome is a thresholded latent score (Albert and Chib, 1993):
 
 \[
-T_{ij}^* = \beta_j S_i + \gamma_j + \varepsilon_{ij}, 
-\qquad T_{ij} = \mathbb{I}(T_{ij}^* > 0), \quad 
-\varepsilon_{ij} \sim \mathcal{N}(0, 1)
+T_{ij} = \mathbf{1}(V_{ij} > 0), \qquad
+V_{ij} = \beta_j S_i D_i - \gamma_j + \varepsilon_{ij}, \qquad
+\varepsilon_{ij} \sim N(0, 1).
 \]
 
-Here, \( S_i \) captures subject-level severity when \( D_i = 1 \), allowing tests to respond differently across mild and strong infections.  
-This yields more realistic inference on sensitivity, specificity, and prevalence, particularly when residual dependence exists among assays.
-
-
-## Latent Gaussian Representation
-
-The latent Gaussian formulation provides an intuitive view of how the detection threshold \( \gamma_j \) separates test outcomes between healthy and diseased individuals:
-
+\(D_i \in \{0,1\}\) is latent disease status, with prevalence \(\rho = P(D_i = 1)\). Non-diseased subjects are anchored at \(S_i = 0\), so \(V_{ij} \mid D_i = 0 \sim N(-\gamma_j, 1)\). Diseased subjects have severity \(S_i > 0\), and \(\beta_j > 0\) is the assay-specific slope on that severity. The three roles stay separate: \(\gamma_j\) sets specificity, \(\beta_j\) scales the disease effect, and \(S_i\) induces residual dependence among assays within the diseased class.
 
 <p align="center">
-  <img src="figures/V_plot.png" width="70%">
+  <img src="figures/Vij_plot.png" width="72%" alt="Latent score distributions for healthy and diseased subjects, with threshold gamma_j">
 </p>
 
----
+Implied accuracy has a closed form only for specificity:
 
-## Function: `bayesian_severity_LCA()`
-
-A unified function implementing **three model configurations** for the latent severity term \( S_i \):
-
-### 1. Conditional Independence (CI) Model  
-A baseline model assuming no within-class variation in disease severity:  
 \[
-S_i = D_i \quad \text{(binary latent disease indicator only)}
+\mathrm{Sp}_j = \Phi(\gamma_j), \qquad
+\mathrm{Se}_j = \mathbb{E}_S\!\left[\Phi(\beta_j S - \gamma_j)\right].
 \]
-This reduces to the classical Hui–Walter framework, serving as a reference model for conditional independence diagnostics.
 
-### 2. Gamma Severity Model  
+Sensitivity is the average of the probit probability over the severity distribution. In the sampler it is computed from the current diseased subjects; the population value is a Monte Carlo integral over \(S\).
+
+Only the product \(\beta_j S_i\) enters the diseased mean, so severity and slope are not separately scaled. The severity variance is fixed at 1 to remove that ambiguity. In the manuscript,
+
 \[
-S_i \mid D_i = 1 \sim \mathrm{Gamma}(\alpha_S, \beta_S)
+S_i \mid D_i = 1 \sim \mathrm{Gamma}(4.5,\sqrt{4.5})
 \]
-Provides a flexible, right-skewed representation of disease severity.  
-The shape parameters \( (\alpha_S, \beta_S) \) can be tuned to reflect expected heterogeneity or residual dependence between assays.
 
-### 3. Normal Moment (NM⁺) Severity Model  
-\[
-p(S_i \mid D_i = 1) \propto S_i^2 
-\exp\!\left[-\frac{(S_i - \mu_0)^2}{2\tau^2}\right],
-\quad S_i > 0
-\]
-A nonlocal prior that discourages near-zero severity, promoting sharper separation between healthy and diseased classes.  
-Defaults \( (\mu_0, \tau) = (0, 1.48495) \) yield unit variance for \( S_i \).
-
----
-
-## Posterior Components
-
-All models employ MCMC with truncated-normal data augmentation for the latent diagnostic variables, including updates for:
-
-- Class indicators \( D_i \)  
-- Test parameters \( (\beta_j, \gamma_j, \sigma_j^2) \)  
-- Prevalence \( \rho \)  
-- Severity priors (CI, Gamma, or NM⁺)
-
----
-
-### Candidate Priors for Severity
-
-The following figure compares the Gamma and NM+ priors for \( S_i \) when each has variance = 1:
+on the rate scale (mean \(\sqrt{4.5}\), variance 1). The Gamma support on \((0,\infty)\) keeps diseased severity away from the non-diseased anchor at 0.
 
 <p align="center">
-  <img src="figures/S_plot.png" width="65%">
+  <img src="figures/Figure_gamma.png" width="62%" alt="Gamma(4.5, sqrt(4.5)) severity prior compared with a standard normal">
 </p>
 
----
+### Two fitted models
 
-### Case Study: Strongyloides Data (Dendukuri & Joseph, 2001)
+`Bayesian_LCA_severity()` dispatches on `severity`.
 
-We replicate and extend the Strongyloides stercoralis dataset analyzed by (Dendukuri, Joseph 1995), originally consisting of three binary assays applied to a refugee population.
-The CI model serves as a baseline, while the Gamma and NM⁺ severity models reveal residual dependence between tests that cannot be explained by conditional independence alone.
+| `severity` | Severity | Role |
+|---|---|---|
+| `"CI"` | \(S_i = D_i\) | Probit conditional-independence model. Sensitivity is \(\Phi(\beta_j - \gamma_j)\). |
+| `"gamma"` | \(S_i \mid D_i = 1 \sim \mathrm{Gamma}(a_S, b_S)\) | Severity model. Default in code is \(a_S = 5\), \(b_S = \sqrt{5}\); the manuscript uses \(a_S = 4.5\), \(b_S = \sqrt{4.5}\). Pass those explicitly. |
 
-The posterior summaries below illustrate how the latent severity formulation provides improved fit and interpretable differences in estimated sensitivity and prevalence across models.
+There is no Normal-moment severity option in this repository. The comparison random-effects model is separate: `bayes_2LCR()` in `R/bayes_2LCR.R` refits the Dendukuri and Joseph (2001) conditional-independence and probit random-effects models (`model = "CI"`, `"random"`, or `"2LCR1"`).
 
----
+### Priors
 
-### Conditional Independence Diagnostics
+Prevalence is \(\rho \sim \mathrm{Beta}(a_\rho, b_\rho)\), default \(\mathrm{Beta}(1,1)\).
 
-To formally evaluate whether test outcomes are independent given disease status, we construct a Bayesian chi-square diagnostic, computed from posterior predictive samples of the latent class model.
+Test priors are on the probit scale and are calibrated from elicited sensitivity and specificity ranges:
 
+- \(\gamma_j \sim N(\mu_{\gamma_j}, \sigma_{\gamma_j}^2)\), matched to the specificity interval through \(\Phi(\gamma_j)\).
+- \(\beta_j \sim N^+(\mu_{\beta_j}, \sigma_{\beta_j}^2)\), truncated to \((0,\infty)\), chosen so the prior predictive distribution of \(\Phi(\beta_j S - \gamma_j)\) matches the sensitivity interval.
 
+`build_priors_from_ranges()` does that calibration. Exact matching is not always possible, because \(\gamma_j\) enters both specificity and the diseased mean.
 
+### Sampler
 
+Both severity models use data augmentation for the latent scores and Gibbs updates for \(\rho \mid D\). The Gamma model also updates \((D_i, S_i)\) with a joint Metropolis step, draws \(V_{ij}\) from truncated normals, and slice-samples \(\log S_i\) for diseased subjects. \(\beta_j\) and \(\gamma_j\) then have Gaussian full conditionals, with \(\beta_j\) truncated at 0. The CI sampler uses an equivalent threshold parameterization and a random-walk update for \(\beta_j\).
 
+Returned objects use `rho_Samples`, `sensitivity_Samples`, `specificity_Samples`, `beta_Samples`, `gamma_Samples`, and `D_Samples`. The Gamma fit also returns `S_Samples`. `bayes_2LCR()` uses different names: `rho`, `sens`, `spec`.
 
+## Layout
 
+```
+R/
+  init.R                         # sources the scripts below
+  Bayesian_severity_LCA.R        # Bayesian_LCA_severity()
+  CI_LCA_probit.R                # conditional-independence sampler
+  Gamma_LCA_severity.R           # Gamma severity sampler
+  build_priors_from_ranges.R     # Se/Sp ranges to probit priors
+  bayes_2LCR.R                   # Dendukuri–Joseph CI and random effects
+  plot_prior_vs_posterior.R
+  plot_prior_vs_posterior_2LCR.R
+data/strongyloides/              # Joseph et al. (1995) reconstruction and fits
+simulate_simple.R                # parameter-recovery runs
+figures/                         # latent-score and severity-prior figures
+```
 
+## Use
 
+From `R/`:
 
+```{r eval=FALSE}
+source("init.R")
+library(truncnorm)
+
+# Joseph, Gyorkos, and Coupal (1995): stool (T1), serology (T2), N = 239
+# both negative 112, stool only 2, serology only 87, both positive 38
+patterns <- c("00", "10", "01", "11")
+freq     <- c(112, 2, 87, 38)
+data <- do.call(rbind, strsplit(rep(patterns, freq), ""))
+data <- apply(data, 2, as.numeric)
+
+ranges <- list(
+  list(sens = c(0.07, 0.47), spec = c(0.89, 0.99)),  # stool
+  list(sens = c(0.63, 0.92), spec = c(0.31, 0.96))   # serology
+)
+
+pr <- build_priors_from_ranges(ranges, severity = "gamma",
+                               aS = 4.5, bS = sqrt(4.5))
+
+fit <- Bayesian_LCA_severity(
+  data       = data,
+  iterations = 5000,
+  burnin     = 1000,
+  thin       = 5,
+  severity   = "gamma",
+  mu_beta    = pr$mu_beta,
+  sd_beta    = pr$sd_beta,
+  mu_gamma   = pr$mu_gamma,
+  sd_gamma   = pr$sd_gamma,
+  aS         = 4.5,
+  bS         = sqrt(4.5),
+  rho_beta   = c(1, 1)
+)
+
+quantile(fit$rho_Samples, c(0.025, 0.5, 0.975))
+```
+
+The manuscript fits use 500,000 iterations and 200,000 burn-in. The call above is only a smoke test.
+
+`data/strongyloides/Strongyloides_data.R` runs the Dendukuri–Joseph replication and the probit CI and Gamma fits. `simulate_simple.R` generates CI and Gamma panels (\(N = 4000\), \(J = 4\), \(\rho = 0.35\)) for recovery checks. Both scripts currently source `~/Desktop/Bayesian-latent-severity-LCA/R/init.R`; point that path at this clone.
+
+## Strongyloides case study
+
+Joseph, Gyorkos, and Coupal (1995) tested 239 Cambodian refugees in Canada with stool examination and serology. The published cross-classification is 38 positive on both assays, 87 positive on serology only, 2 positive on stool examination only, and 112 negative on both. Dendukuri and Joseph (2001) analyzed the same table with informative Beta priors (CI) and a shared Gaussian random effect (RE).
+
+The manuscript refits those two models, then fits the probit CI model and the Gamma severity model under the same elicited ranges: stool sensitivity \([0.07, 0.47]\) and specificity \([0.89, 0.99]\); serology sensitivity \([0.63, 0.92]\) and specificity \([0.31, 0.96]\). A second analysis replaces those ranges with \([0.01, 0.999]\) to see which posteriors still contract. Under informative priors, severity prevalence tracks the random-effects fit; under diffuse priors, the probit models contract where the Beta and random-effects fits do not.
+
+The manuscript also defines a class-specific Pearson statistic, computed from posterior draws of \(D_i\), as a check of conditional independence (Johnson, 2004, 2007). That diagnostic is not implemented in this repository.
+
+## References
+
+Albert, J. H. and Chib, S. (1993). Bayesian analysis of binary and polychotomous response data. *Journal of the American Statistical Association* 88, 669–679.
+
+Dendukuri, N. and Joseph, L. (2001). Bayesian approaches to modeling the conditional dependence between multiple diagnostic tests. *Biometrics* 57, 158–167.
+
+Hui, S. L. and Walter, S. D. (1980). Estimating the error rates of diagnostic tests. *Biometrics* 36, 167–171.
+
+Johnson, V. E. (2004). A Bayesian \(\chi^2\) test for goodness-of-fit. *The Annals of Statistics* 32, 2361–2384.
+
+Johnson, V. E. (2007). Bayesian model assessment using pivotal quantities. *Bayesian Analysis* 2, 719–733.
+
+Joseph, L., Gyorkos, T. W., and Coupal, L. (1995). Bayesian estimation of disease prevalence and the parameters of diagnostic tests in the absence of a gold standard. *American Journal of Epidemiology* 141, 263–272.
+
+Qu, Y., Tan, M., and Kutner, M. H. (1996). Random effects models in latent class analysis for evaluating accuracy of diagnostic tests. *Biometrics* 52, 797–810.

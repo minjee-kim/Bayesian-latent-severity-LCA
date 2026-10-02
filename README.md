@@ -6,15 +6,15 @@ This repository accompanies the manuscript *Bayesian Latent Severity Modeling fo
 
 ## Model
 
-For subject \(i\) and test \(j\), the binary outcome is a thresholded latent score (Albert and Chib, 1993):
+For subject $i$ and test $j$, the binary outcome is a thresholded latent score (Albert and Chib, 1993):
 
-\[
+$$
 T_{ij} = \mathbf{1}(V_{ij} > 0), \qquad
 V_{ij} = \beta_j S_i D_i - \gamma_j + \varepsilon_{ij}, \qquad
 \varepsilon_{ij} \sim N(0, 1).
-\]
+$$
 
-\(D_i \in \{0,1\}\) is latent disease status, with prevalence \(\rho = P(D_i = 1)\). Non-diseased subjects are anchored at \(S_i = 0\), so \(V_{ij} \mid D_i = 0 \sim N(-\gamma_j, 1)\). Diseased subjects have severity \(S_i > 0\), and \(\beta_j > 0\) is the assay-specific slope on that severity. The three roles stay separate: \(\gamma_j\) sets specificity, \(\beta_j\) scales the disease effect, and \(S_i\) induces residual dependence among assays within the diseased class.
+$D_i \in \{0,1\}$ is latent disease status, with prevalence $\rho = P(D_i = 1)$. Non-diseased subjects are anchored at $S_i = 0$, so $V_{ij} \mid D_i = 0 \sim N(-\gamma_j, 1)$. Diseased subjects have severity $S_i > 0$, and $\beta_j > 0$ is the assay-specific slope on that severity. The three roles stay separate: $\gamma_j$ sets specificity, $\beta_j$ scales the disease effect, and $S_i$ induces residual dependence among assays within the diseased class.
 
 <p align="center">
   <img src="figures/Vij_plot.png" width="72%" alt="Latent score distributions for healthy and diseased subjects, with threshold gamma_j">
@@ -22,20 +22,20 @@ V_{ij} = \beta_j S_i D_i - \gamma_j + \varepsilon_{ij}, \qquad
 
 Implied accuracy has a closed form only for specificity:
 
-\[
+$$
 \mathrm{Sp}_j = \Phi(\gamma_j), \qquad
-\mathrm{Se}_j = \mathbb{E}_S\!\left[\Phi(\beta_j S - \gamma_j)\right].
-\]
+\mathrm{Se}_j = \mathbb{E}_S\left[\Phi(\beta_j S - \gamma_j)\right].
+$$
 
-Sensitivity is the average of the probit probability over the severity distribution. In the sampler it is computed from the current diseased subjects; the population value is a Monte Carlo integral over \(S\).
+Sensitivity is the average of the probit probability over the severity distribution. In the sampler it is computed from the current diseased subjects; the population value is a Monte Carlo integral over $S$.
 
-Only the product \(\beta_j S_i\) enters the diseased mean, so severity and slope are not separately scaled. The severity variance is fixed at 1 to remove that ambiguity. In the manuscript,
+Only the product $\beta_j S_i$ enters the diseased mean, so severity and slope are not separately scaled. The severity variance is fixed at 1 to remove that ambiguity. In the manuscript,
 
-\[
+$$
 S_i \mid D_i = 1 \sim \mathrm{Gamma}(4.5,\sqrt{4.5})
-\]
+$$
 
-on the rate scale (mean \(\sqrt{4.5}\), variance 1). The Gamma support on \((0,\infty)\) keeps diseased severity away from the non-diseased anchor at 0.
+on the rate scale (mean $\sqrt{4.5}$, variance 1). The Gamma support on $(0,\infty)$ keeps diseased severity away from the non-diseased anchor at 0.
 
 <p align="center">
   <img src="figures/Figure_gamma.png" width="62%" alt="Gamma(4.5, sqrt(4.5)) severity prior compared with a standard normal">
@@ -47,25 +47,25 @@ on the rate scale (mean \(\sqrt{4.5}\), variance 1). The Gamma support on \((0,\
 
 | `severity` | Severity | Role |
 |---|---|---|
-| `"CI"` | \(S_i = D_i\) | Probit conditional-independence model. Sensitivity is \(\Phi(\beta_j - \gamma_j)\). |
-| `"gamma"` | \(S_i \mid D_i = 1 \sim \mathrm{Gamma}(a_S, b_S)\) | Severity model. Default in code is \(a_S = 5\), \(b_S = \sqrt{5}\); the manuscript uses \(a_S = 4.5\), \(b_S = \sqrt{4.5}\). Pass those explicitly. |
+| `"CI"` | $S_i = D_i$ | Probit conditional-independence model. Sensitivity is $\Phi(\beta_j - \gamma_j)$. |
+| `"gamma"` | $S_i \mid D_i = 1 \sim \mathrm{Gamma}(a_S, b_S)$ | Severity model. Default in code is $a_S = 5$, $b_S = \sqrt{5}$; the manuscript uses $a_S = 4.5$, $b_S = \sqrt{4.5}$. Pass those explicitly. |
 
 There is no Normal-moment severity option in this repository. The comparison random-effects model is separate: `bayes_2LCR()` in `R/bayes_2LCR.R` refits the Dendukuri and Joseph (2001) conditional-independence and probit random-effects models (`model = "CI"`, `"random"`, or `"2LCR1"`).
 
 ### Priors
 
-Prevalence is \(\rho \sim \mathrm{Beta}(a_\rho, b_\rho)\), default \(\mathrm{Beta}(1,1)\).
+Prevalence is $\rho \sim \mathrm{Beta}(a_\rho, b_\rho)$, default $\mathrm{Beta}(1,1)$.
 
 Test priors are on the probit scale and are calibrated from elicited sensitivity and specificity ranges:
 
-- \(\gamma_j \sim N(\mu_{\gamma_j}, \sigma_{\gamma_j}^2)\), matched to the specificity interval through \(\Phi(\gamma_j)\).
-- \(\beta_j \sim N^+(\mu_{\beta_j}, \sigma_{\beta_j}^2)\), truncated to \((0,\infty)\), chosen so the prior predictive distribution of \(\Phi(\beta_j S - \gamma_j)\) matches the sensitivity interval.
+- $\gamma_j \sim N(\mu_{\gamma_j}, \sigma_{\gamma_j}^2)$, matched to the specificity interval through $\Phi(\gamma_j)$.
+- $\beta_j \sim N^+(\mu_{\beta_j}, \sigma_{\beta_j}^2)$, truncated to $(0,\infty)$, chosen so the prior predictive distribution of $\Phi(\beta_j S - \gamma_j)$ matches the sensitivity interval.
 
-`build_priors_from_ranges()` does that calibration. Exact matching is not always possible, because \(\gamma_j\) enters both specificity and the diseased mean.
+`build_priors_from_ranges()` does that calibration. Exact matching is not always possible, because $\gamma_j$ enters both specificity and the diseased mean.
 
 ### Sampler
 
-Both severity models use data augmentation for the latent scores and Gibbs updates for \(\rho \mid D\). The Gamma model also updates \((D_i, S_i)\) with a joint Metropolis step, draws \(V_{ij}\) from truncated normals, and slice-samples \(\log S_i\) for diseased subjects. \(\beta_j\) and \(\gamma_j\) then have Gaussian full conditionals, with \(\beta_j\) truncated at 0. The CI sampler uses an equivalent threshold parameterization and a random-walk update for \(\beta_j\).
+Both severity models use data augmentation for the latent scores and Gibbs updates for $\rho \mid D$. The Gamma model also updates $(D_i, S_i)$ with a joint Metropolis step, draws $V_{ij}$ from truncated normals, and slice-samples $\log S_i$ for diseased subjects. $\beta_j$ and $\gamma_j$ then have Gaussian full conditionals, with $\beta_j$ truncated at 0. The CI sampler uses an equivalent threshold parameterization and a random-walk update for $\beta_j$.
 
 Returned objects use `rho_Samples`, `sensitivity_Samples`, `specificity_Samples`, `beta_Samples`, `gamma_Samples`, and `D_Samples`. The Gamma fit also returns `S_Samples`. `bayes_2LCR()` uses different names: `rho`, `sens`, `spec`.
 
@@ -129,15 +129,15 @@ quantile(fit$rho_Samples, c(0.025, 0.5, 0.975))
 
 The manuscript fits use 500,000 iterations and 200,000 burn-in. The call above is only a smoke test.
 
-`data/strongyloides/Strongyloides_data.R` runs the Dendukuri–Joseph replication and the probit CI and Gamma fits. `simulate_simple.R` generates CI and Gamma panels (\(N = 4000\), \(J = 4\), \(\rho = 0.35\)) for recovery checks. Both scripts currently source `~/Desktop/Bayesian-latent-severity-LCA/R/init.R`; point that path at this clone.
+`data/strongyloides/Strongyloides_data.R` runs the Dendukuri–Joseph replication and the probit CI and Gamma fits. `simulate_simple.R` generates CI and Gamma panels ($N = 4000$, $J = 4$, $\rho = 0.35$) for recovery checks. Both scripts currently source `~/Desktop/Bayesian-latent-severity-LCA/R/init.R`; point that path at this clone.
 
 ## Strongyloides case study
 
 Joseph, Gyorkos, and Coupal (1995) tested 239 Cambodian refugees in Canada with stool examination and serology. The published cross-classification is 38 positive on both assays, 87 positive on serology only, 2 positive on stool examination only, and 112 negative on both. Dendukuri and Joseph (2001) analyzed the same table with informative Beta priors (CI) and a shared Gaussian random effect (RE).
 
-The manuscript refits those two models, then fits the probit CI model and the Gamma severity model under the same elicited ranges: stool sensitivity \([0.07, 0.47]\) and specificity \([0.89, 0.99]\); serology sensitivity \([0.63, 0.92]\) and specificity \([0.31, 0.96]\). A second analysis replaces those ranges with \([0.01, 0.999]\) to see which posteriors still contract. Under informative priors, severity prevalence tracks the random-effects fit; under diffuse priors, the probit models contract where the Beta and random-effects fits do not.
+The manuscript refits those two models, then fits the probit CI model and the Gamma severity model under the same elicited ranges: stool sensitivity $[0.07, 0.47]$ and specificity $[0.89, 0.99]$; serology sensitivity $[0.63, 0.92]$ and specificity $[0.31, 0.96]$. A second analysis replaces those ranges with $[0.01, 0.999]$ to see which posteriors still contract. Under informative priors, severity prevalence tracks the random-effects fit; under diffuse priors, the probit models contract where the Beta and random-effects fits do not.
 
-The manuscript also defines a class-specific Pearson statistic, computed from posterior draws of \(D_i\), as a check of conditional independence (Johnson, 2004, 2007). That diagnostic is not implemented in this repository.
+The manuscript also defines a class-specific Pearson statistic, computed from posterior draws of $D_i$, as a check of conditional independence (Johnson, 2004, 2007). That diagnostic is not implemented in this repository.
 
 ## References
 
@@ -147,7 +147,7 @@ Dendukuri, N. and Joseph, L. (2001). Bayesian approaches to modeling the conditi
 
 Hui, S. L. and Walter, S. D. (1980). Estimating the error rates of diagnostic tests. *Biometrics* 36, 167–171.
 
-Johnson, V. E. (2004). A Bayesian \(\chi^2\) test for goodness-of-fit. *The Annals of Statistics* 32, 2361–2384.
+Johnson, V. E. (2004). A Bayesian $\chi^2$ test for goodness-of-fit. *The Annals of Statistics* 32, 2361–2384.
 
 Johnson, V. E. (2007). Bayesian model assessment using pivotal quantities. *Bayesian Analysis* 2, 719–733.
 

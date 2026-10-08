@@ -137,7 +137,7 @@ The published Joseph, Gyorkos, and Coupal (1995) table has 239 subjects: 112 neg
 
 Dendukuri and Joseph (2001) fit a conditional-independence model and a shared random effect to the same table. The manuscript refits those, then fits the probit conditional-independence model and the Gamma severity model. Under the elicited ranges, severity prevalence tracks the random-effect fit. Under ranges `[0.01, 0.999]`, the probit models contract and the Beta and random-effect fits do not.
 
-The manuscript defines a class-specific Pearson statistic from posterior draws of `D_i` (Johnson, 2004, 2007). That check is not implemented here.
+The class-specific Pearson statistic is implemented in `R/Bayesian_CI_Test.R` as `Bayesian_CI_Test()`. It is not sourced by `R/init.R`, and no script calls it, so the manuscript check has not been run from this repo.
 
 ## References
 

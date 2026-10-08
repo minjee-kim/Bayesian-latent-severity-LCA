@@ -129,15 +129,15 @@ quantile(fit$rho_Samples, c(0.025, 0.5, 0.975))
 
 The manuscript fits use 500,000 iterations and 200,000 burn-in. The call above is only a smoke test.
 
-`data/strongyloides/Strongyloides_data.R` runs the Dendukuri–Joseph replication and the probit CI and Gamma fits. `simulate_simple.R` generates CI and Gamma panels ($N = 4000$, $J = 4$, $\rho = 0.35$) for recovery checks. Both scripts currently source `~/Desktop/Bayesian-latent-severity-LCA/R/init.R`; point that path at this clone.
+`simulate_simple.R` generates CI and Gamma panels ($N = 4000$, $J = 4$, $\rho = 0.35$). That is not the two-test design in the manuscript. It also sources `~/Desktop/Bayesian-latent-severity-LCA/R/init.R`.
 
-## Strongyloides case study
+## Strongyloides
 
-Joseph, Gyorkos, and Coupal (1995) tested 239 Cambodian refugees in Canada with stool examination and serology. The published cross-classification is 38 positive on both assays, 87 positive on serology only, 2 positive on stool examination only, and 112 negative on both. Dendukuri and Joseph (2001) analyzed the same table with informative Beta priors (CI) and a shared Gaussian random effect (RE).
+The published Joseph, Gyorkos, and Coupal (1995) table has 239 subjects: 112 negative on both tests, 2 stool only, 87 serology only, 38 positive on both. The call above builds that table. `data/strongyloides/Strongyloides_data.R` still expands `c(38, 2, 87, 35)` and sources a Desktop path. Do not use it to reproduce the manuscript until both are fixed.
 
-The manuscript refits those two models, then fits the probit CI model and the Gamma severity model under the same elicited ranges: stool sensitivity $[0.07, 0.47]$ and specificity $[0.89, 0.99]$; serology sensitivity $[0.63, 0.92]$ and specificity $[0.31, 0.96]$. A second analysis replaces those ranges with $[0.01, 0.999]$ to see which posteriors still contract. Under informative priors, severity prevalence tracks the random-effects fit; under diffuse priors, the probit models contract where the Beta and random-effects fits do not.
+Dendukuri and Joseph (2001) fit a conditional-independence model and a shared random effect to the same table. The manuscript refits those, then fits the probit conditional-independence model and the Gamma severity model. Under the elicited ranges, severity prevalence tracks the random-effect fit. Under ranges `[0.01, 0.999]`, the probit models contract and the Beta and random-effect fits do not.
 
-The manuscript also defines a class-specific Pearson statistic, computed from posterior draws of $D_i$, as a check of conditional independence (Johnson, 2004, 2007). That diagnostic is not implemented in this repository.
+The manuscript defines a class-specific Pearson statistic from posterior draws of `D_i` (Johnson, 2004, 2007). That check is not implemented here.
 
 ## References
 
